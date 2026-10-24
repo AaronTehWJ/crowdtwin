@@ -257,7 +257,8 @@ End recording at or before 1:30.
 - Do not claim Factory Droid or Claude participated. The badges read
   `Deterministic fallback`; live Droid coordination has not completed an
   end-to-end run.
-- Do not claim Mana usage or link a Mana page. No link exists.
+- Do not claim more about Mana usage than the two linked pages in `README.md`
+  show.
 - Do not describe the 400 attendees as a sample of 40,000 real visitors or the
   scenario frequencies as calibrated probabilities.
 - Do not say the simulation predicts real behavior; the inspector text itself
@@ -265,9 +266,9 @@ End recording at or before 1:30.
 
 ## Manual submission checklist (not done by this repository)
 
-- [ ] Paste the public Mana page/chat link into `README.md` under
-      `## How Mana Changed What We Built` and describe the decisions it
-      influenced. The section is a placeholder until a real link exists.
+- [x] Mana links are in `README.md` under `## How Mana Changed What We Built`.
+      A description of the specific decisions those sessions influenced can
+      still be added by hand.
 - [ ] Record the 90-second capture using this script. No recording has been
       produced or checked in.
 - [ ] Credentialed Droid coordination (`FACTORY_API_KEY` with

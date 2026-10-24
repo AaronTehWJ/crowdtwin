@@ -25,7 +25,7 @@ production application.
 | Apify and Claude adapters | Implemented; live provider calls unverified because keys were absent |
 | Restricted Factory Droid coordination | On `main`, fail-closed; inert offline or without `FACTORY_API_KEY`; no credentialed end-to-end run has completed |
 | Six-beat React/Vite studio | Implemented in `apps/web`; 19 vitest tests, typecheck, build, and the browser studio gate passed on 2026-10-24 |
-| Recording and submission materials | Manual; measured shot list in [`docs/demo-script.md`](docs/demo-script.md), no recording or Mana link exists |
+| Recording and submission materials | Manual; measured shot list in [`docs/demo-script.md`](docs/demo-script.md), Mana links added below; no recording exists |
 
 The latest implementation checks ran on **2026-10-24** at commit `250b6d6`:
 the web tests (`npm --workspace=apps/web test`, 19 passed), the orchestrator
@@ -411,17 +411,18 @@ repeated; the coordinator's unit tests cover its restriction logic offline.
 
 ## How Mana Changed What We Built
 
-**Manual item: add your actual public Mana page/chat link and describe the
-specific decisions it influenced.**
+The workflow approach and build plan were brainstormed and refined in Mana, and
+the prototype was built from there. The pages below are the user-provided Mana
+links for this project; the brainstorm board is publicly viewable (view-only)
+and contains a "Demo & Build Plan" page.
 
-Brainstorming & refining workflow approach:https://www.mana.space/home/cwaWYKmyeZTs7SX0NlXLP8V93Ec2/brainstorm
+- Brainstorming and refining the workflow approach:
+  <https://www.mana.space/home/cwaWYKmyeZTs7SX0NlXLP8V93Ec2/brainstorm>
+- Prototype building:
+  <https://www.mana.space/home/cwaWYKmyeZTs7SX0NlXLP8V93Ec2/apps/crowdtwin>
 
-Prototype builiding: https://www.mana.space/home/cwaWYKmyeZTs7SX0NlXLP8V93Ec2/apps/crowdtwin
-
-No public Mana link or Mana usage has been verified. This section is a placeholder,
-not a claim of usage or submission eligibility. The 90-second submission
-recording also remains a manual item; a measured shot list with the exact
-on-screen values is in [`docs/demo-script.md`](docs/demo-script.md).
+The 90-second submission recording remains a manual item; a measured shot list
+with the exact on-screen values is in [`docs/demo-script.md`](docs/demo-script.md).
 
 ## Contributing
 
