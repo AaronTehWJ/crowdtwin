@@ -13,7 +13,9 @@ recommendation. CrowdTwin does **not** approve financing or transfer money.
 
 ## Current status
 
-This is a **local backend prototype**, not yet a finished web application.
+This is a **local prototype with a working React/Vite studio**, running
+entirely against local services and bundled fixtures. It is not a hosted or
+production application.
 
 | Area | Status |
 | --- | --- |
@@ -21,18 +23,27 @@ This is a **local backend prototype**, not yet a finished web application.
 | Deterministic Rust engine, local SpacetimeDB, generated TypeScript bindings | Implemented and tested |
 | Express API, approval gate, paired variants, explanations, risk policy | Implemented and tested offline |
 | Apify and Claude adapters | Implemented; live provider calls unverified because keys were absent |
-| Restricted Factory Droid coordination | Blocked during integration; not delivered on `main` |
-| Six-beat React/Vite studio | Planned; `apps/web` currently contains a scaffold and generated bindings |
-| Recording and submission materials | Pending |
+| Restricted Factory Droid coordination | On `main`, fail-closed; inert offline or without `FACTORY_API_KEY`; no credentialed end-to-end run has completed |
+| Six-beat React/Vite studio | Implemented in `apps/web`; 19 vitest tests, typecheck, build, and the browser studio gate passed on 2026-10-24 |
+| Recording and submission materials | Manual; measured shot list in [`docs/demo-script.md`](docs/demo-script.md), no recording or Mana link exists |
 
-The latest implementation checks ran on **2026-10-24**. Phases 1–2 passed their
-gates, and the offline Phase 3 API flow passed. The separate Droid smoke check
-stopped **before sending a prompt**: the installed CLI still reported
-`ToolSearch` enabled after it was included in `disabledToolIds`. The integration
-fails closed rather than allowing tools outside the approved application set.
+The latest implementation checks ran on **2026-10-24** at commit `250b6d6`:
+the web tests (`npm --workspace=apps/web test`, 19 passed), the orchestrator
+tests (`npm --workspace=apps/orchestrator test`, 12 passed), `npm run typecheck`,
+`npm run build`, and `node scripts/studio-gate.mjs` (exit 0) with the local
+services running in offline mode. The demo figures below were re-measured in the
+same session.
 
-There is no web development server or usable studio at `localhost:5173` yet.
-The intended client is **React/Vite, not Next.js**.
+The Droid coordinator is delivered but **live coordination is unverified**. The
+one credentialed smoke check stopped **before sending a prompt**: the installed
+CLI still reported `ToolSearch` enabled after it was included in
+`disabledToolIds`. In that situation the coordinator's post-restriction check
+refuses to prompt and fails the job with `503 DROID_RESTRICTION_FAILED` rather
+than allowing tools outside the approved application set. The studio's runtime
+note reflects this.
+
+The studio runs at `http://127.0.0.1:5173` once the API is up (see
+[Run locally](#run-locally)). The client is **React/Vite, not Next.js**.
 
 ## What the prototype does
 
@@ -50,13 +61,21 @@ The intended client is **React/Vite, not Next.js**.
 6. **Inspect risk:** explain exact recorded decisions and evaluate 45 scenario
    runs using deterministic underwriting rules.
 
-The planned studio will bring these steps into a dark, single-screen interface
-with a draggable booth, a 1000×1000 canvas, agent inspection, live telemetry, and
-a vendor/underwriter view switcher.
+The studio in `apps/web` presents these six beats on one dark page: an intake
+sidebar with the provenance badge (`CAPTURED · MODELED DEMO` for fixtures), a
+read-only evidence panel, a review form with a draggable booth on a 1,000 × 1,000
+assumption-map canvas plus editable economics and per-cost confirmation boxes, a
+Rust baseline view with Play/Pause/`+10x Step`/`Finish baseline` controls,
+telemetry cards, a customer inspector that shows the exact recorded
+`DecisionEvent`, a paired-intervention comparison table, and an Underwriter Desk
+with the policy verdict, proposed cap, and three scenario summaries. A header
+switcher toggles `1 · Vendor Sandbox` and `2 · Underwriter Desk`. The browser
+reads simulation rows through a public SpacetimeDB subscription and never holds
+the mutation token.
 
 ## Architecture
 
-One Rust crate, one Express process, one planned React app, and local SpacetimeDB.
+One Rust crate, one Express process, one React/Vite app, and local SpacetimeDB.
 There are no distributed jobs or multi-tenant authentication services.
 
 ```mermaid
@@ -66,7 +85,7 @@ flowchart LR
   Gate --> DB[SpacetimeDB and Rust]
   DB --> Policy[Deterministic policy]
   API <--> Explain[Claude or fallback]
-  API -. HTTP and SSE .-> UI[Planned React studio]
+  API -. HTTP and SSE .-> UI[React/Vite studio]
   DB -. Subscriptions .-> UI
 ```
 
@@ -90,8 +109,9 @@ packages/contracts/       Frozen shared schemas and companion validation
 fixtures/                 Modeled ATL/Bay Area evidence and default world
 crates/spacetime-module/   Rust engine, tables, reducers, and tests
 apps/orchestrator/        Express API, adapters, workflow, and risk policy
-apps/web/                 Planned React/Vite client scaffold
+apps/web/                 React/Vite studio, vitest tests, and generated bindings
 scripts/                  Local environment setup and integration gates
+docs/                     Measured 90-second demo recording script
 ```
 
 Both apps' `src/module_bindings/` directories are generated from Rust. Do not
@@ -164,6 +184,22 @@ curl --fail http://localhost:4000/api/health
 Healthy offline operation reports `ok: true`, `spacetime: "CONNECTED"`, and
 `OFFLINE_DISABLED` for external providers.
 
+### 4. Start the studio
+
+With the API running, in another terminal:
+
+```bash
+npm --workspace=apps/web run dev
+```
+
+Open `http://127.0.0.1:5173`. Vite binds `127.0.0.1:5173` with `--strictPort`
+and proxies `/api` to `http://127.0.0.1:4000`, so the API must already be up.
+The API accepts browser origins `http://localhost:5173`, `http://127.0.0.1:5173`,
+`http://localhost:4000`, and `http://127.0.0.1:4000` only. The browser
+subscribes to public SpacetimeDB tables directly on `http://127.0.0.1:3000`
+(override with `VITE_SPACETIMEDB_URI` / `VITE_SPACETIMEDB_DB_NAME`; only
+`localhost`/`127.0.0.1` over plain HTTP is accepted).
+
 ## API workflow
 
 Start an explicit fixture intake:
@@ -221,9 +257,19 @@ end-to-end test, including approval-bypass rejection.
   replaced with a fixture.
 - Successful live evidence is normalized and atomically cached in ignored
   `fixtures/last-live-capture.json`. Raw actor datasets are not bundled.
-- `ANTHROPIC_API_KEY` enables the Claude adapter. Factory coordination remains
-  blocked as described above; configuring a key does not make that integration
-  verified or complete.
+- `ANTHROPIC_API_KEY` enables the Claude adapter when `OFFLINE_MODE=false`.
+- `FACTORY_API_KEY` together with `OFFLINE_MODE=false` enables the restricted
+  Droid coordinator (`apps/orchestrator/src/droidCoordinator.ts`). Without both
+  it is inert and the deterministic workflow runs, labelled
+  `DETERMINISTIC_FALLBACK`. With both, it starts a session at
+  `AutonomyLevel.Off`, lists tools, disables everything outside the five
+  `crowdtwin___*` MCP tools, re-lists to verify, and fails the job with
+  `503 DROID_RESTRICTION_FAILED` if any other tool is still enabled. The tools
+  take no arguments and only call stage-gated workflow methods; the audit tool
+  returns the unchanged deterministic policy result. No credentialed end-to-end
+  run has completed; the manual check is `npx tsx scripts/droid-smoke.ts`, which
+  needs an exported `FACTORY_API_KEY` and network access and never contacts
+  Apify or Anthropic. Configuring a key does not make the integration verified.
 
 ## Accounting, determinism, and policy
 
@@ -267,8 +313,12 @@ validated demand forecast**.
 
 ### Measured demo results
 
-ATL fixture, seed 42, full eight-hour horizon. The intervention combines relocation,
-one additional server, and the $4,500 inventory cap.
+ATL fixture, seed 42 (fixed server-side), full 28,800-second (8h 00m) horizon,
+default booth position and economics, all four costs confirmed. Re-measured on
+2026-10-24 at commit `250b6d6` through both the HTTP API and the browser gate;
+both produced the same figures. The intervention combines relocation, one
+additional server, and the $4,500 inventory cap. Per-option figures, audit
+tables, and a timed shot list are in [`docs/demo-script.md`](docs/demo-script.md).
 
 | Rust result | Baseline | Intervention |
 | --- | ---: | ---: |
@@ -282,8 +332,12 @@ one additional server, and the $4,500 inventory cap.
 
 The intervention reduces cash exposure and queue rejection, but added labor
 outweighs its extra contribution margin. It does **not** turn this setup profitable.
-With confirmed costs, policy remains `REJECT`. The original illustrative
-`−$24,600` and `+$3,120` figures are not acceptance targets.
+With confirmed costs, policy is `REJECT` for both runs: 0/15 BASE runs break
+even, LOW P10 profit is −$10,604.00 (baseline) and −$10,890.80 (intervention),
+and the proposed inventory-preparation cap is $4,500.00. With any cost left
+unconfirmed the verdict is `NEEDS_INPUT`. The original illustrative `−$24,600`
+and `+$3,120` figures are not acceptance targets and the engine does not
+reproduce them.
 
 ## Verification
 
@@ -297,18 +351,31 @@ SPACETIME_CLI="$(command -v spacetime)" npx tsx scripts/database-gate.ts
 
 # Also requires the running API in offline mode.
 npx tsx scripts/api-gate.ts
+
+# Studio unit tests (jsdom + testing-library); no services required.
+npm --workspace=apps/web test
+
+# Browser acceptance gate. Requires the database, the API in offline mode, the
+# Vite studio on port 5173, and the agent-browser CLI on PATH. Writes
+# screenshots to the ignored test-results/ directory.
+node scripts/studio-gate.mjs
 ```
 
 Integration gates **write local test runs**. The database gate resets only its
-`gate-baseline` and `gate-variant` runs; the API gate creates new jobs and runs and
-submits fixture approvals as test requests. Do not use them against a shared or
-production database.
+`gate-baseline` and `gate-variant` runs; the API gate and the studio gate create
+new jobs and runs and submit fixture approvals as test requests. Do not use them
+against a shared or production database.
 
 Previously passed checks cover accounting, rounding, replay, paired traits,
 service progress, inventory limits, run isolation, scenario summaries, generated
 subscriptions, approval enforcement, SSE replay, variants, and recorded-event
-explanations. Real Apify/Anthropic calls and browser acceptance tests remain
-unverified. The separate credentialed Droid restriction check failed closed.
+explanations. On 2026-10-24 at `250b6d6` the web tests, typecheck, build, and
+the studio gate passed; the gate drives all six beats in a real browser, checks
+that a live failure never substitutes fixture evidence, that unconfirmed costs
+yield `NEEDS_INPUT`, and that the on-screen figures equal the measured table
+above. Real Apify/Anthropic calls remain unverified. The separate credentialed
+Droid restriction check failed closed before prompting and has not been
+repeated; the coordinator's unit tests cover its restriction logic offline.
 
 ## Troubleshooting and limits
 
@@ -320,6 +387,15 @@ unverified. The separate credentialed Droid restriction check failed closed.
   it or pasting credentials into logs.
 - **Old run requires approval after restart:** approval metadata is intentionally
   not persisted. Create a new job.
+- **Studio will not start on 5173:** the dev script uses `--strictPort`, so
+  another process on `127.0.0.1:5173` makes Vite exit instead of choosing a
+  different port. Free the port; do not change it, because the API only accepts
+  the listed local origins.
+- **Studio shows "Local services are unavailable":** the Vite proxy could not
+  reach `http://127.0.0.1:4000`. Start the API first, then refresh.
+- **Simulation badge reads `DISCONNECTED`:** the browser's public SpacetimeDB
+  subscription dropped. Use the `Reconnect` button; displayed rows may be stale
+  until it reconnects.
 - **Bindings fail to type-check:** confirm all SpacetimeDB components are 1.12.0
   and regenerate both clients. The current Rust `*Data` types and `*Row` aliases
   avoid a 1.12 generator naming collision. Generated imports require the apps'
@@ -339,8 +415,9 @@ unverified. The separate credentialed Droid restriction check failed closed.
 specific decisions it influenced.**
 
 No public Mana link or Mana usage has been verified. This section is a placeholder,
-not a claim of usage or submission eligibility. The actual 90-second submission
-recording also remains a manual item.
+not a claim of usage or submission eligibility. The 90-second submission
+recording also remains a manual item; a measured shot list with the exact
+on-screen values is in [`docs/demo-script.md`](docs/demo-script.md).
 
 ## Contributing
 

@@ -2,8 +2,12 @@
 
 CrowdTwin is a local spatial vendor-economics simulator and underwriting prototype.
 Read `README.md` for current delivery status, setup, measured results, and blockers.
-Do not describe the planned React/Vite studio or restricted Droid coordinator as
-complete until their acceptance gates pass.
+The React/Vite studio is delivered; its gates are the web vitest suite, typecheck,
+build, and `scripts/studio-gate.mjs`. The restricted Droid coordinator is on
+`main` and fails closed, but no credentialed end-to-end run has completed: never
+describe live Droid coordination as verified. `docs/demo-script.md` quotes
+measured engine output; re-measure it whenever the engine, fixtures, default
+world, or policy change.
 
 ## Ownership and invariants
 
@@ -38,6 +42,9 @@ complete until their acceptance gates pass.
   Fail closed if the tool boundary cannot be enforced.
 - Never commit `.env`, mutation tokens, `.spacetime/`, runtime captures, or build
   artifacts. Do not log secrets or raw provider datasets.
+- `scripts/droid-smoke.ts` is a manual credentialed check needing an exported
+  `FACTORY_API_KEY` and network. Never run it in CI or without explicit
+  authorization, and never commit its output.
 
 ## Commands and generated files
 
@@ -49,6 +56,7 @@ npm install
 npm --workspace=packages/contracts run build
 npm --workspace=packages/contracts test
 npm --workspace=apps/orchestrator test
+npm --workspace=apps/web test
 npm run typecheck
 npm run build
 cargo fmt --manifest-path crates/spacetime-module/Cargo.toml --check
@@ -58,7 +66,10 @@ npm run verify
 
 Run the narrow checks relevant to each change. For documentation-only changes,
 verify paths, commands, claims, and `git diff --check`; do not claim unrun tests.
-There is no dedicated lint command or runnable web dev script yet.
+There is no dedicated lint command.
+
+`npm --workspace=apps/web run dev` serves the studio on `127.0.0.1:5173` and
+proxies `/api` to the running API.
 
 Never hand-edit either app's `src/module_bindings/`. After Rust schema/reducer
 changes, run Rust tests, publish locally, regenerate both clients, and type-check:
@@ -76,6 +87,14 @@ the README setup. They mutate test runs; do not use a shared database.
 ```bash
 SPACETIME_CLI="$(command -v spacetime)" npx tsx scripts/database-gate.ts
 npx tsx scripts/api-gate.ts
+```
+
+For studio changes, also run the browser gate with the database, offline API, and
+Vite dev server running and the `agent-browser` CLI on `PATH`. It writes only to
+the ignored `test-results/` directory and asserts the measured demo figures.
+
+```bash
+node scripts/studio-gate.mjs
 ```
 
 ## Delivery
