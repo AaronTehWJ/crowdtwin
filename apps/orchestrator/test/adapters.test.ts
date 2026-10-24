@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { apifyInput, collectLive, defaultWorld, loadFixture, normalizeEvidence, validateEventUrl } from '../src/apifyAdapter.js';
+import { apifyInput, assertEventIdentity, collectLive, defaultWorld, loadFixture, normalizeEvidence, validateEventUrl } from '../src/apifyAdapter.js';
 import { ClaudeService } from '../src/claudeService.js';
 import { providers } from '../src/config.js';
 import { boundInput } from '../src/errors.js';
@@ -19,7 +19,17 @@ test('actor input uses string URLs and disables organizer enrichment and harvest
     enrichOrganizer: false, harvestOrganizerEmails: false, monitoringMode: false,
   });
 });
-test('current actor fields preserve venue, zero coordinates, USD cents and unknown prices', () => {
+test('event identity check accepts the requested Eventbrite event and rejects substitutes', () => {
+  const url = 'https://www.eventbrite.com/e/atlanta-handmade-food-small-business-festival-2026-tickets-1995040808764';
+  assert.doesNotThrow(() => assertEventIdentity(url, { eventId: '1995040808764', eventUrl: `${url}/` }));
+  assert.doesNotThrow(() => assertEventIdentity(url, { id: 1995040808764 }));
+  const wrongEvent = (e: unknown) => (e as any).code === 'WRONG_EVENT' && (e as any).status === 422;
+  assert.throws(() => assertEventIdentity(url, { eventId: '1995040808765', eventUrl: url }), wrongEvent);
+  assert.throws(() => assertEventIdentity(url, { eventId: '1995040808764', url: 'https://evil.example/e/atlanta-handmade-food-small-business-festival-2026-tickets-1995040808764' }), wrongEvent);
+  assert.throws(() => assertEventIdentity(url, { name: 'No id', eventUrl: url }), wrongEvent);
+  assert.throws(() => assertEventIdentity('https://lu.ma/crowdtwin', { url: 'https://lu.ma/other' }), wrongEvent);
+  assert.doesNotThrow(() => assertEventIdentity('https://lu.ma/crowdtwin', { url: 'https://lu.ma/crowdtwin' }));
+});test('current actor fields preserve venue, zero coordinates, USD cents and unknown prices', () => {
   const item = {
     eventId: 'event', name: 'Test event', description: 'Public event',
     startDate: '2026-10-24T11:00:00-04:00', endDate: '2026-10-24T19:00:00-04:00',

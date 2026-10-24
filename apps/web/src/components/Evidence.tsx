@@ -18,7 +18,7 @@ export function Evidence({ world }: { world: WorldSpec }) {
       <dt>Actor run</dt><dd>{e.actorRunId ? <a href={`https://console.apify.com/actors/runs/${encodeURIComponent(e.actorRunId)}`} target="_blank" rel="noreferrer">{e.actorRunId}</a> : 'None (not a live actor run)'}</dd>
     </dl>
     <p className="fine">RSVPs and organizer claims do not establish turnout.</p>
-    {e.durationHours > 12 && <p className="notice">This multi-day event is simulated over its full {e.durationHours}-hour elapsed span. Overnight closures are not modeled; review this assumption before approving.</p>}
+    {e.durationHours > 12 && <p className="notice">This event spans {e.durationHours} hours. The simulation uses elapsed time without closures: arrivals are spread over the first half of the span, fixed costs are not prorated, and the map, archetypes, and booth economics are the modeled defaults unless you edit them. Review these assumptions before approving.</p>}
     {/^https?:\/\//.test(e.sourceUrl) && <a href={e.sourceUrl} target="_blank" rel="noreferrer">Source reference ↗</a>}
   </section>;
 }

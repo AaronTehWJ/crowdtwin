@@ -33,11 +33,33 @@ export async function defaultWorld(evidence?: EventEvidence): Promise<WorldSpec>
 export class CollectionError extends AppError {
   constructor(cause: string) {
     super(503, 'COLLECTION_TIMEOUT', 'Live collection did not produce validated evidence', {
-      cause, fixtureAction: 'Load Captured Demo Fixture (CAPTURED mode)',
+      cause, fixtureAction: 'Load Captured Fixture (CAPTURED mode)',
     });
   }
 }
 
+const eventbriteHosts = ['eventbrite.com', 'www.eventbrite.com'];
+const trimSlash = (pathname: string) => pathname.replace(/\/+$/, '');
+// Confirms a dataset item describes the requested event before it can replace a reviewed capture.
+export function assertEventIdentity(requestedUrl: string, item: Record<string, any>): void {
+  const requested = new URL(validateEventUrl(requestedUrl));
+  const expectedId = eventbriteHosts.includes(requested.hostname) ? /-(\d+)\/?$/.exec(requested.pathname)?.[1] : undefined;
+  if (eventbriteHosts.includes(requested.hostname)) {
+    if (!expectedId) throw new AppError(422, 'WRONG_EVENT', 'The requested Eventbrite URL has no numeric event id to verify');
+    const returnedId = String(item.eventId ?? item.id ?? '');
+    if (returnedId !== expectedId)
+      throw new AppError(422, 'WRONG_EVENT', `Expected Eventbrite event ${expectedId}; the dataset item reports ${returnedId || 'no event id'}`);
+  }
+  const itemUrl = item.eventUrl ?? item.url;
+  if (itemUrl === undefined || itemUrl === null || itemUrl === '') {
+    if (!expectedId) throw new AppError(422, 'WRONG_EVENT', 'The dataset item exposes no event URL, so the requested event cannot be verified');
+    return;
+  }
+  let returned: URL;
+  try { returned = new URL(String(itemUrl)); } catch { throw new AppError(422, 'WRONG_EVENT', 'The dataset item URL is not a valid URL'); }
+  if (returned.hostname !== requested.hostname || trimSlash(returned.pathname) !== trimSlash(requested.pathname))
+    throw new AppError(422, 'WRONG_EVENT', `Expected ${requested.hostname}${requested.pathname}; the dataset item points at ${returned.hostname}${returned.pathname}`);
+}
 type Collection = { runId: string; datasetId?: string; item: Record<string, any> };
 export type Collector = (url: string, token: string) => Promise<Collection>;
 export const apifyInput = (url: string) => ({

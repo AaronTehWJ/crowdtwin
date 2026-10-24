@@ -21,3 +21,19 @@ it('explains missing keys and offers explicit fixture loading without substituti
   expect(screen.queryByText('READ-ONLY EVIDENCE')).toBeNull();
   expect(calls.filter(path => path === '/api/jobs')).toHaveLength(1);
 });
+it('offers the three saved fixtures with the real Apify snapshot selected by default', async () => {
+  vi.stubGlobal('EventSource', class { close() {} });
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(
+    { ok: true, offline: true, spacetime: 'CONNECTED', apify: 'OFFLINE', claude: 'OFFLINE', factory: 'OFFLINE' }))));
+  render(<App />);
+  await screen.findByText('Offline providers');
+  const select = screen.getByRole('combobox') as HTMLSelectElement;
+  expect(select.closest('label')?.textContent?.startsWith('Saved event fixture')).toBe(true);
+  expect(Array.from(select.options).map(option => [option.value, option.textContent])).toEqual([
+    ['atl', 'Atlanta festival · Apify snapshot'],
+    ['demo', 'ATL festival · modeled demo'],
+    ['bay', 'Bay Area market · modeled demo'],
+  ]);
+  expect(select.value).toBe('atl');
+  expect(screen.getByText('Load a saved event to review costs and placement.', { exact: false })).toBeTruthy();
+});
