@@ -1,0 +1,20 @@
+{
+  "name": "crowdtwin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/contracts", "apps/orchestrator", "apps/web"],
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:rust": "cargo test --manifest-path crates/spacetime-module/Cargo.toml",
+    "verify": "npm run build && npm run typecheck && npm test && npm run test:rust"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3"
+  }
+}
