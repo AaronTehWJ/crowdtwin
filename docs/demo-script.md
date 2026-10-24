@@ -8,8 +8,9 @@ not produce or claim a recording; see the checklist at the end.
 
 - **Measured on:** 2026-10-24, repository commit `250b6d6` (`main`), against the
   locally running SpacetimeDB, offline API, and Vite studio.
-- **Run configuration:** ATL fixture (`fixtures/default-world-spec.json`,
-  `"mode":"CAPTURED","fixture":"atl"`), seed **42** (fixed server-side in
+- **Run configuration:** ATL fixture evidence (`fixtures/captured-event.json`)
+  with the default world from `fixtures/default-world-spec.json`, requested as
+  `"mode":"CAPTURED","fixture":"atl"`; seed **42** (fixed server-side in
   `apps/orchestrator/src/workflow.ts`), horizon **28,800 simulated seconds
   (8h 00m)**, 400 simulated attendees, booth left at the default position
   (`x=180, y=280`), all default booth economics unchanged, and all four costs
