@@ -411,15 +411,97 @@ repeated; the coordinator's unit tests cover its restriction logic offline.
 
 ## How Mana Changed What We Built
 
-The workflow approach and build plan were brainstormed and refined in Mana, and
-the prototype was built from there. The pages below are the user-provided Mana
-links for this project; the brainstorm board is publicly viewable (view-only)
-and contains a "Demo & Build Plan" page.
+The architecture and build plan were brainstormed and refined in Mana, and the
+prototype was built from there. Both Mana pages below are public; the brainstorm
+board contains a "Demo & Build Plan" page. Mana reviewed our earlier pipeline
+assumptions and caught the following problems before they were built. Each item
+states what shipped on `main` as a result; where the shipped code differs from
+the original pivot, the difference is noted.
 
 - Brainstorming and refining the workflow approach:
   <https://www.mana.space/home/cwaWYKmyeZTs7SX0NlXLP8V93Ec2/brainstorm>
 - Prototype building:
   <https://www.mana.space/home/cwaWYKmyeZTs7SX0NlXLP8V93Ec2/apps/crowdtwin>
+
+### What Mana caught
+
+1. **Apify actor replacement.** Earlier assumption: use
+   `matyascimbulka/luma-event-scraper` for Luma and `apify/google-maps-scraper`
+   for competitors. Mana's finding: the Luma actor only accepts city/category
+   discovery slugs, not a direct event URL. What shipped: a single
+   `memo23/eventbrite-scraper` call in `apps/orchestrator/src/apifyAdapter.ts`
+   that takes the event URL directly for eventbrite.com and lu.ma/luma.com,
+   with `maxItems: 1`, `enrichOrganizer: false`, and
+   `harvestOrganizerEmails: false`. No competitor or Google Places crawler was
+   built: the planned `compass/crawler-google-places` call does not exist, and
+   `nearbyCompetitorPriceBands` holds only what the event item or fixture
+   supplies.
+2. **Real `@factory/droid-sdk` wiring.** Earlier assumption: treat Droid as a
+   generic LLM wrapper in one loop. Mana's finding: the real
+   `@factory/droid-sdk/node` surface is `createSdkMcpServer()` with Zod 3 tool
+   helpers, one active stream per session, and only `disabledToolIds` (no
+   allowlist). What shipped: `apps/orchestrator/src/droidCoordinator.ts`
+   creates the session at `AutonomyLevel.Off` with `disableBuiltinSkills: true`,
+   lists tools, passes every tool outside the five `crowdtwin___*` tools to
+   `disabledToolIds`, re-lists to verify, and uses a deny-by-default
+   `permissionHandler` that proceeds only for those five MCP tools. The
+   restriction logic is unit-tested offline; no credentialed end-to-end run has
+   completed. The async design (end the turn, poll Apify from Node, resume the
+   session) was not implemented: `collect_event` calls the workflow
+   synchronously under the adapter's 25-second deadline.
+3. **The "10-second live scrape" myth.** Earlier assumption: a live scrape
+   finishes in under 10 seconds, or a cached fallback is swapped in silently.
+   Mana's finding: Apify cold starts carry no 10-second guarantee, and a silent
+   swap violates the Hyphenate rule (what's real, what's simulated, and how they
+   know). What shipped: `ProvenanceModeSchema` (`LIVE`, `CAPTURED`, `MANUAL`)
+   in `packages/contracts/src/index.ts`, the `AWAITING_APPROVAL` human gate in
+   the workflow, and a `COLLECTION_TIMEOUT` error that offers explicit fixture
+   loading instead of substituting it. Intake accepts `CAPTURED` fixtures or
+   `LIVE` URLs; `MANUAL` exists only in the schema. The bundled fixtures are
+   modeled demo data with `actorRunId: null`, so they carry no original Apify
+   run ID. A successful live capture is written to the ignored
+   `fixtures/last-live-capture.json` with its actor run ID and `capturedAtIso`,
+   and `LIVE` evidence fails validation without a real run ID.
+4. **Replacing a four-number payload with `WorldSpec` and `DecisionEvent`.**
+   Earlier assumption: pass `expected_turnout`, `ticket_price`,
+   `competitor_count`, and `duration_hours`. Mana's finding: four numbers cannot
+   model spatial paths, queue balking, capacity, stockouts, or COGS, and Claude
+   would hallucinate "why didn't you buy" without the customer's exact state.
+   What shipped: the frozen `WorldSpecSchema` (evidence, anchors, booth,
+   personas, `configHash`) in `packages/contracts/src/index.ts`, with evidence
+   immutable during approval and the hash recomputed server-side, and the
+   public Rust `decision_event` table in `crates/spacetime-module/src/tables.rs`
+   whose rows record `agentWalletCents`, `agentHunger`, `agentPatienceSec`,
+   `observedPriceCents`, `estimatedWaitSec`, and `remainingStock` at decision
+   time. The explain endpoint only narrates a recorded row.
+5. **Double-counted inventory math and RNG drift.** Earlier assumption:
+   subtract the upfront inventory outlay and per-item COGS in one metric, and
+   use one global RNG. Mana's finding: that double-counts inventory, and a
+   global RNG makes any change shift every later draw, invalidating the
+   before/after comparison. What shipped: `Accounts::update` in
+   `crates/spacetime-module/src/engine.rs` keeps `net_profit_cents` (revenue
+   minus consumed COGS, organizer fee, booth fee, staff/equipment) separate
+   from `cash_balance_cents` (revenue minus organizer fee, full inventory
+   outlay, booth fee, staff/equipment), and `trait_random(seed, agent, purpose)`
+   derives each agent's traits from SplitMix64 keyed by run seed, agent ID, and
+   purpose tag, so paired variants keep the same attendees.
+6. **Separating RSVPs from turnout and food budgets.** Earlier assumption:
+   treat the scraped RSVP count as verified attendance and the ticket price as
+   the food budget. Mana's finding: an RSVP is not a check-in, a missing count
+   is unknown rather than zero, and a $150 ticket is admission, not spending
+   money. What shipped: no `EvidenceRecord` wrapper or source-kind enum exists.
+   Instead `EventEvidenceSchema` keeps `platformRsvpCount`,
+   `organizerClaimedAttendance`, and `ticketPriceCents` as separate nullable
+   fields, validation preserves `null`, the evidence panel renders `Unknown`,
+   the attendee count is the reviewed `totalSimulatedAttendees`, and wallets
+   come from persona wallet ranges, not the ticket price.
+7. **Strict URL hostname parsing instead of `url.includes()`.** Earlier
+   assumption: `url.includes("eventbrite.com")`. Mana's finding: that lets
+   `https://attacker.com/?q=eventbrite.com` trigger paid actor runs. What
+   shipped: `validateEventUrl` in `apps/orchestrator/src/apifyAdapter.ts`
+   parses with `new URL()`, requires `https:`, and matches `url.hostname`
+   exactly against `eventbrite.com`, `www.eventbrite.com`, `lu.ma`, and
+   `luma.com`, rejecting credentials and custom ports.
 
 The 90-second submission recording remains a manual item; a measured shot list
 with the exact on-screen values is in [`docs/demo-script.md`](docs/demo-script.md).

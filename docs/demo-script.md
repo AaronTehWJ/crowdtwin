@@ -266,9 +266,10 @@ End recording at or before 1:30.
 
 ## Manual submission checklist (not done by this repository)
 
-- [x] Mana links are in `README.md` under `## How Mana Changed What We Built`.
-      A description of the specific decisions those sessions influenced can
-      still be added by hand.
+- [x] Mana links are in `README.md` under `## How Mana Changed What We Built`,
+      and that section now describes the seven decisions Mana changed. The
+      spoken pitch may cite one or two of them, but must not claim anything
+      beyond what that section says.
 - [ ] Record the 90-second capture using this script. No recording has been
       produced or checked in.
 - [ ] Credentialed Droid coordination (`FACTORY_API_KEY` with
