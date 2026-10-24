@@ -5,6 +5,7 @@ import { api, sourceLabel, type Health, type Intake, type Job } from './api';
 import { useJob } from './useJob';
 import { Review } from './components/Review';
 import { Evidence } from './components/Evidence';
+import { Simulation } from './components/Simulation';
 
 export function App() {
   const [health, setHealth] = useState<Health>();
@@ -71,7 +72,7 @@ export function App() {
           {!world && <section className="panel empty-state"><div className="orbital"><i /><i /><i /><b>ct</b></div><p className="eyebrow">A SMALL WORLD. A CLEARER DECISION.</p><h2>What does a full crowd<br />actually mean for your booth?</h2><p>Load a modeled event to review costs and placement.<br />Nothing runs until you approve the assumptions.</p><div className="empty-steps"><span>01 Evidence</span><span>02 Review</span><span>03 Simulate</span><span>04 Inspect</span><span>05 Compare</span><span>06 Underwrite</span></div></section>}
           {world && !approved && job?.stage === 'AWAITING_APPROVAL' && <Review key={job.id} initial={world} busy={busy} onApprove={approve} />}
           {world && !approved && job?.stage !== 'AWAITING_APPROVAL' && <section className="panel"><h2>{job?.stage === 'INITIALIZING' ? 'Preparing your Rust world…' : 'Drafting the review…'}</h2><p>No model can approve assumptions on your behalf.</p></section>}
-          {approved && <section className="panel"><p className="eyebrow">HUMAN APPROVED</p><h2>Rust world ready</h2><p>Run <code>{approved.runId}</code> has been initialized. Simulation controls and the {view === 'vendor' ? 'agent inspector' : 'risk desk'} are the next studio chunk.</p></section>}
+          {approved && <Simulation key={approved.runId} runId={approved.runId} world={approved.world} />}
         </div>
       </div>
     </main>
