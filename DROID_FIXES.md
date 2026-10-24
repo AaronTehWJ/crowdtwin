@@ -3,7 +3,7 @@
 Date: October 24, 2026  
 Target repository: https://github.com/AaronTehWJ/crowdtwin  
 Source inspected: `b9f4648ebfefe6843f82a78c7d3c710a3502fbb0`  
-Status: **Ready for local implementation. No fixes or paid smoke tests have been executed by this handoff.**
+Status: **Superseded at `54a4b00`; see `FACTORY_BUILD_PROMPT.md`.** Disposition: P0.1 replaced by the full-span design (72-hour evidence cap, no simulation window); P0.2 partially implemented (real capture replayable as `atl` with provenance file; no capture store/IDs, no build ID or content hash; `captured-event.json` is replaced by design, guarded by `--replace` since `b68141d`); P1.1 and P1.2 not implemented.
 
 ## Mission and boundaries
 
@@ -17,9 +17,9 @@ Do not modify `/workspace/crowdtwin-runtime`, its vendored source, saved runs, o
 
 ## Source-established defects
 
-- `packages/contracts/src/validation.ts`: evidence start/end duration must be positive and at most 12 hours. All three candidate listings are longer.
+- `packages/contracts/src/validation.ts`: evidence start/end duration must be positive and at most 72 hours since `54a4b00`. The inspected commit capped it at 12 hours, shorter than all three candidate listings.
 - `apps/orchestrator/src/apifyAdapter.ts`: normalizes the entire event span into `durationHours`; successful LIVE results write `fixtures/last-live-capture.json`.
-- `apps/orchestrator/src/workflow.ts`: CAPTURED accepts only named `atl`/`bay` fixtures. A fresh live capture cannot be explicitly selected for replay.
+- `apps/orchestrator/src/workflow.ts`: CAPTURED accepts only the named `atl`/`demo`/`bay` fixtures (`atl` replays the saved real capture since `54a4b00`). A fresh live capture still cannot be selected by capture ID.
 - `apps/orchestrator/src/server.ts`: the route is `/api/jobs`. Advice using `/jobs` is incorrect; do not rename the working API to match that advice.
 - `packages/contracts/src/index.ts` and the normalizer do not preserve organizer follower/event counts.
 - `apps/orchestrator/src/policy.ts`: the policy uses confirmed costs, scenario profitability and organizer revenue share, not profile statistics. Its inventory cap is the lesser of $4,500 and configured inventory outlay, not an inferred $1,500.

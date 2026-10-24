@@ -16,9 +16,12 @@ earlier measurements cited here.
 
 - **Measured on:** 2026-10-24, repository commit `250b6d6` (`main`), against the
   locally running SpacetimeDB, offline API, and Vite studio.
-- **Run configuration:** ATL fixture evidence (`fixtures/modeled-atl-event.json`)
-  with the default world from `fixtures/default-world-spec.json`, requested as
-  `"mode":"CAPTURED","fixture":"demo"`; seed **42** (fixed server-side in
+- **Run configuration:** modeled ATL evidence (`fixtures/modeled-atl-event.json`)
+  with the default world from `fixtures/default-world-spec.json`. At `250b6d6`
+  this was requested as `"mode":"CAPTURED","fixture":"atl"`, when that name
+  still pointed at the modeled file; since `54a4b00` the request is
+  `"mode":"CAPTURED","fixture":"demo"` and `atl` is the real 32-hour snapshot.
+  Seed **42** (fixed server-side in
   `apps/orchestrator/src/workflow.ts`), horizon **28,800 simulated seconds
   (8h 00m)**, 400 simulated attendees, booth left at the default position
   (`x=180, y=280`), all default booth economics unchanged, and all four costs
@@ -113,9 +116,10 @@ BALKED_QUEUE_WAIT, not a prediction about my real behavior."
    note under it is visible. Do not record with provider keys configured.
 4. **Prepare two tabs.** The spec opens on a finished result, but
    `Load Captured Fixture` discards the current approved run in that tab.
-   - Tab A ("The Moment"): run the whole flow once before recording: load the
-     ATL fixture, confirm all four costs, approve, click `Finish baseline`,
-     open `Paired comparison`, check all three options, click
+   - Tab A ("The Moment"): run the whole flow once before recording: select
+     `ATL festival · modeled demo` in `Saved event fixture`, click
+     `Load Captured Fixture`, confirm all four costs, approve, click
+     `Finish baseline`, open `Paired comparison`, check all three options, click
      `Rerun Paired Seed`, then return to `Simulation & inspection` so the
      completed telemetry is on screen. Leave this tab alone.
    - Tab B (the six beats): a fresh page load with nothing loaded yet.
@@ -162,8 +166,10 @@ Spoken lines are suggestions. Keep them plain; read values from the screen.
 
 ### 0:22 - 0:32 Beat 1: intake with provenance (Tab B)
 
-- **Action:** switch to Tab B. In `01 / EVENT INTAKE`, leave
-  `Saved event fixture` on `ATL festival · modeled demo` and click `Load Captured Fixture`.
+- **Action:** switch to Tab B. In `01 / EVENT INTAKE`, select
+  `ATL festival · modeled demo` in `Saved event fixture` (the default is
+  `Atlanta festival · Apify snapshot`, the real 32-hour event, which produces
+  different numbers) and click `Load Captured Fixture`.
 - **On screen:** the progress list fills with milestones ending in
   `Human review required. No simulation has been initialized.`; the header
   badge changes to `CAPTURED · MODELED DEMO`; the sidebar `READ-ONLY EVIDENCE`
@@ -259,6 +265,8 @@ End recording at or before 1:30.
 
 - Do not call the fixture live, scraped, or verified data. It is modeled demo
   data in `CAPTURED` transport mode with no actor run.
+- Do not select `Atlanta festival · Apify snapshot` for this script; its figures
+  differ.
 - Do not call the policy verdict a funding, loan, or approval decision. It is
   a deterministic recommendation about inventory preparation limits.
 - Do not say `-$24,600`, `+$3,120`, or any figure not on screen.

@@ -103,7 +103,13 @@ for cold starts and can recover an existing run without another paid execution:
 node --import tsx scripts/capture-apify.ts
 # Optional: URL and existing successful actor run ID
 node --import tsx scripts/capture-apify.ts EVENT_URL RUN_ID
+# Required when the saved capture describes a different event
+node --import tsx scripts/capture-apify.ts EVENT_URL --replace
 ```
+
+The script requires the returned item to match the requested event (Eventbrite
+numeric ID and event URL; `WRONG_EVENT` otherwise) and refuses to replace a
+capture whose provenance names a different event unless `--replace` is passed.
 
 After validation, write normalized `CAPTURED` evidence to
 `fixtures/captured-event.json` and run/dataset metadata to

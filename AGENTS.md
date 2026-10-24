@@ -35,21 +35,31 @@ world, or policy change.
   explicit `--server http://127.0.0.1:3000`. Never reset data to bypass a failure.
 - `OFFLINE_MODE=true` must prevent external provider calls even when keys exist.
   Live failures must offer explicit fixture loading, never silently substitute it.
-- Label bundled fixtures as modeled demo data in `CAPTURED` mode, with no invented
-  actor-run IDs. Never invent Mana links, model usage, live verification, or funding.
+- Modeled fixtures (`demo`, `bay`) are labelled modeled demo data in `CAPTURED`
+  mode with `actorRunId: null`. `fixtures/captured-event.json` is a real
+  normalized capture; its run ID must match
+  `fixtures/captured-event.provenance.json`. Never invent actor-run IDs, Mana
+  links, model usage, live verification, or funding.
 - Keep Droid at `AutonomyLevel.Off`, discover tools before prompting, disable tools
   outside the application set, deny unknown permissions, and close sessions.
   Fail closed if the tool boundary cannot be enforced.
-- Never commit `.env`, mutation tokens, `.spacetime/`, runtime captures, or build
-  artifacts. Do not log secrets or raw provider datasets.
+- Never commit `.env`, mutation tokens, `.spacetime/`, runtime captures
+  (`fixtures/last-live-capture.json` and raw actor datasets; the reviewed
+  `fixtures/captured-event*.json` are tracked), or build artifacts. Do not log
+  secrets or raw provider datasets.
 - `scripts/droid-smoke.ts` is a manual credentialed check needing an exported
   `FACTORY_API_KEY` and network. Never run it in CI or without explicit
   authorization, and never commit its output.
+- `scripts/capture-apify.ts` is a manual, paid Apify call. Never run it in CI or
+  without explicit authorization. It refuses to replace a capture of a different
+  event unless `--replace` is passed.
 
 ## Commands and generated files
 
 Run from the repository root. Use Node 22+, Rust 1.90.0, and matching SpacetimeDB
 1.12.0 module/CLI/client versions. Retain both npm and Cargo lockfiles.
+`scripts/spacetime.sh` is the owner's pinned-CLI wrapper; a matching `spacetime`
+on `PATH` is equivalent.
 
 ```bash
 npm install

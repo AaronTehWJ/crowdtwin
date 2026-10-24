@@ -24,15 +24,16 @@ production application.
 | Express API, approval gate, paired variants, explanations, risk policy | Implemented and tested offline |
 | Apify and Claude adapters | Apify capture verified locally with a real event/run/dataset; Claude live calls remain unverified |
 | Restricted Factory Droid coordination | On `main`, fail-closed; inert offline or without `FACTORY_API_KEY`; no credentialed end-to-end run has completed |
-| Six-beat React/Vite studio | Implemented in `apps/web`; 20 vitest tests, typecheck, build, and the browser studio gate passed on 2026-10-24 |
+| Six-beat React/Vite studio | Implemented in `apps/web`; 21 vitest tests, typecheck, build, and the browser studio gate passed on 2026-10-24 |
 | Recording and submission materials | Manual; measured shot list in [`docs/demo-script.md`](docs/demo-script.md), Mana links and architectural decisions documented below; no recording exists |
 
 Local verification on **2026-10-24** passed: `npm run verify` (7 contract,
-14 orchestrator, 20 web, and 8 Rust tests), the database integration gate,
-the API gate for both the eight-hour modeled demo and the real 32-hour capture,
-and the six-beat browser studio gate. SpacetimeDB 1.12 is running locally and
-both TypeScript clients were regenerated. The modeled demo figures below were
-re-measured unchanged; they do not describe the real captured event.
+15 orchestrator, 21 web, and 8 Rust tests at `b68141d`), the database
+integration gate (at `54a4b00`), the API gate for both the eight-hour modeled
+demo and the real 32-hour capture, and the six-beat browser studio gate.
+SpacetimeDB 1.12 is running locally and both TypeScript clients were
+regenerated. The modeled demo figures below were re-measured unchanged; they do
+not describe the real captured event.
 
 The Droid coordinator is delivered but **live coordination is unverified**. The
 one credentialed smoke check stopped **before sending a prompt**: the installed
@@ -47,8 +48,10 @@ The studio runs at `http://127.0.0.1:5173` once the API is up (see
 
 ## What the prototype does
 
-1. **Collect evidence:** explicitly load the ATL or Bay Area fixture, or request
-   live collection from a supported event URL.
+1. **Collect evidence:** explicitly load a saved fixture (`Atlanta festival ·
+   Apify snapshot`, the real 32-hour capture; `ATL festival · modeled demo`; or
+   `Bay Area market · modeled demo`), or request live collection from a
+   supported event URL.
 2. **Draft assumptions:** prepare a normalized venue map, three attendee
    archetypes, and editable vendor economics. Offline drafts are labeled
    deterministic fallbacks.
@@ -106,7 +109,7 @@ flowchart LR
 
 ```text
 packages/contracts/       Frozen shared schemas and companion validation
-fixtures/                 Modeled ATL/Bay Area evidence and default world
+fixtures/                 Real ATL capture, modeled demo evidence, default world
 crates/spacetime-module/   Rust engine, tables, reducers, and tests
 apps/orchestrator/        Express API, adapters, workflow, and risk policy
 apps/web/                 React/Vite studio, vitest tests, and generated bindings
@@ -212,9 +215,11 @@ curl --fail http://localhost:4000/api/jobs \
   --data '{"mode":"CAPTURED","fixture":"atl"}'
 ```
 
-Use `"bay"` for the Bay Area fixture. The response contains a job ID. Read the
-job or its SSE stream until it reaches `AWAITING_APPROVAL`, review the returned
-`world`, then submit the complete reviewed world to the approval endpoint.
+`"atl"` is the real 32-hour Apify snapshot; `"demo"` is the modeled eight-hour
+ATL event that reproduces the measured figures below; `"bay"` is the modeled
+Bay Area fixture. The response contains a job ID. Read the job or its SSE stream
+until it reaches `AWAITING_APPROVAL`, review the returned `world`, then submit
+the complete reviewed world to the approval endpoint.
 
 | Method and route | Purpose |
 | --- | --- |
@@ -247,12 +252,17 @@ end-to-end test, including approval-bypass rejection.
   The modeled examples remain available as `fixture: "demo"` and `fixture: "bay"`,
   with null actor IDs. See [fixture notes](fixtures/README.md).
 - Events up to 72 hours are supported. This captured event spans 32 elapsed
-  hours, including overnight time; closures are not modeled. Prices and attendance
+  hours, including overnight time; closures are not modeled. Arrivals are spread
+  over the first half of the span, booth fee and staff/equipment are flat per run
+  (not prorated), and the map, archetypes, and booth economics come from the
+  modeled default world unless edited during review. Prices and attendance
   missing from the actor remain unknown.
 - To refresh the snapshot explicitly, run `node --import tsx scripts/capture-apify.ts`.
   It loads the local Apify key, allows a 120-second cold start, validates the result,
   and writes normalized evidence plus run/dataset metadata. An optional URL and
-  existing run ID recover a completed run without another actor execution.
+  existing run ID recover a completed run without another actor execution. The
+  returned item must match the requested event (Eventbrite numeric ID and URL),
+  and a capture of a different event is only replaced with `--replace`.
 - The default world has **400 individual attendees and three archetypes**.
   It is not a weighted simulation of the modeled 40,000-person organizer claim.
 - `OFFLINE_MODE=true` disables provider calls even if credentials exist in the
@@ -324,7 +334,8 @@ validated demand forecast**.
 
 ### Measured demo results
 
-ATL fixture, seed 42 (fixed server-side), full 28,800-second (8h 00m) horizon,
+Modeled ATL demo fixture (`fixture: "demo"`, `fixtures/modeled-atl-event.json`),
+seed 42 (fixed server-side), full 28,800-second (8h 00m) horizon,
 default booth position and economics, all four costs confirmed. Re-measured on
 2026-10-24 at commit `250b6d6` through both the HTTP API and the browser gate;
 both produced the same figures. The intervention combines relocation, one
@@ -349,6 +360,21 @@ and the proposed inventory-preparation cap is $4,500.00. With any cost left
 unconfirmed the verdict is `NEEDS_INPUT`. The original illustrative `−$24,600`
 and `+$3,120` figures are not acceptance targets and the engine does not
 reproduce them.
+
+### Measured real-event run
+
+The real 32-hour snapshot (`fixture: "atl"`, `fixtures/captured-event.json`)
+was measured on 2026-10-24 at `54a4b00` through the API gate with seed 42, a
+115,200-second horizon, all four costs confirmed, and the default booth.
+Baseline: 138 units sold, $2,484.00 gross sales, −$10,089.20 net profit,
+−$21,261.20 cash balance, $12,000.00 inventory outlay, 8 queue-wait and 172
+price rejections. Scenarios: LOW 0/15 (P10 −$10,590.80), BASE 0/15 (P10
+−$10,135.40), HIGH 0/15 (P10 −$9,779.00); verdict `REJECT`, proposed cap
+$4,500.00. The combined intervention (relocation, one additional server, and
+the cap): 141 units, $2,538.00 gross, −$10,369.40 net, −$14,023.40 cash, 0
+queue-wait and 172 price rejections; verdict `REJECT`. `REJECT` follows from the
+30% organizer cut, which exceeds the 25% rule regardless of horizon. These
+figures are not the demo-script figures and the studio gate does not assert them.
 
 ## Verification
 
@@ -380,11 +406,11 @@ against a shared or production database.
 Previously passed checks cover accounting, rounding, replay, paired traits,
 service progress, inventory limits, run isolation, scenario summaries, generated
 subscriptions, approval enforcement, SSE replay, variants, and recorded-event
-explanations. On 2026-10-24 at `250b6d6` the web tests, typecheck, build, and
-the studio gate passed; the gate drives all six beats in a real browser, checks
-that a live failure never substitutes fixture evidence, that unconfirmed costs
-yield `NEEDS_INPUT`, and that the on-screen figures equal the measured table
-above. Apify capture was verified locally on 2026-10-24; real Anthropic calls remain unverified. The separate credentialed
+explanations. On 2026-10-24 at `b68141d`, `npm run verify`, the web tests,
+typecheck, build, the API gate, and the studio gate passed; the gate drives all
+six beats in a real browser, checks that a live failure never substitutes
+fixture evidence, that unconfirmed costs yield `NEEDS_INPUT`, and that the
+on-screen figures equal the measured table above. Apify capture was verified locally on 2026-10-24; real Anthropic calls remain unverified. The separate credentialed
 Droid restriction check failed closed before prompting and has not been
 repeated; the coordinator's unit tests cover its restriction logic offline.
 
@@ -468,10 +494,13 @@ the original pivot, the difference is noted.
    in `packages/contracts/src/index.ts`, the `AWAITING_APPROVAL` human gate in
    the workflow, and a `COLLECTION_TIMEOUT` error that offers explicit fixture
    loading instead of substituting it. Intake accepts `CAPTURED` fixtures or
-   `LIVE` URLs; `MANUAL` exists only in the schema. The bundled fixtures are
-   modeled demo data with `actorRunId: null`, so they carry no original Apify
-   run ID. A successful live capture is written to the ignored
-   `fixtures/last-live-capture.json` with its actor run ID and `capturedAtIso`,
+   `LIVE` URLs; `MANUAL` exists only in the schema. The `demo` and `bay`
+   fixtures are modeled demo data with `actorRunId: null`, so they carry no
+   Apify run ID; `fixtures/captured-event.json` (`atl`) is a real capture from
+   run `yJgu1aGVtuTerBN8h`, with the dataset reference in
+   `fixtures/captured-event.provenance.json`. A successful live capture is
+   written to the ignored `fixtures/last-live-capture.json` with its actor run
+   ID and `capturedAtIso`,
    and `LIVE` evidence fails validation without a real run ID.
 4. **Replacing a four-number payload with `WorldSpec` and `DecisionEvent`.**
    Earlier assumption: pass `expected_turnout`, `ticket_price`,
