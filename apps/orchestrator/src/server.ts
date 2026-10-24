@@ -5,7 +5,7 @@ import { Workflow, type Job, type Milestone } from './workflow.js';
 import { AppError, boundInput } from './errors.js';
 
 const allowedOrigins = new Set(['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:4000', 'http://127.0.0.1:4000']);
-export function createApp(workflow: Workflow, coordinator: (job: Job) => Promise<void> = job => workflow.intake(job)) {
+export function createApp(workflow: Workflow, coordinator: (job: Job) => Promise<void> = job => workflow.intake(job), audit: (id: string) => Promise<unknown> = id => workflow.audit(id)) {
   const app = express();
   app.disable('x-powered-by');
   app.use((req, _res, next) => {
@@ -57,7 +57,7 @@ export function createApp(workflow: Workflow, coordinator: (job: Job) => Promise
     const { eventId } = z.object({ eventId: z.string().min(1).max(180) }).strict().parse(req.body);
     res.json(await workflow.explain(req.params.id, eventId));
   });
-  app.get('/api/runs/:id/audit', async (req, res) => res.json(await workflow.audit(req.params.id)));
+  app.get('/api/runs/:id/audit', async (req, res) => res.json(await audit(req.params.id)));
   app.use((_req, res) => res.status(404).json({ code: 'NOT_FOUND', message: 'Unknown API endpoint' }));
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     if (error instanceof ZodError) return res.status(400).json({ code: 'INVALID_INPUT', message: 'Input validation failed', issues: error.issues.map(e => ({ path: e.path, message: e.message })) });
