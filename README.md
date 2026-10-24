@@ -414,6 +414,10 @@ repeated; the coordinator's unit tests cover its restriction logic offline.
 **Manual item: add your actual public Mana page/chat link and describe the
 specific decisions it influenced.**
 
+Brainstorming & refining workflow approach:https://www.mana.space/home/cwaWYKmyeZTs7SX0NlXLP8V93Ec2/brainstorm
+
+Prototype builiding: https://www.mana.space/home/cwaWYKmyeZTs7SX0NlXLP8V93Ec2/apps/crowdtwin
+
 No public Mana link or Mana usage has been verified. This section is a placeholder,
 not a claim of usage or submission eligibility. The 90-second submission
 recording also remains a manual item; a measured shot list with the exact
