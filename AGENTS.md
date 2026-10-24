@@ -1,0 +1,92 @@
+# CrowdTwin repository guide
+
+CrowdTwin is a local spatial vendor-economics simulator and underwriting prototype.
+Read `README.md` for current delivery status, setup, measured results, and blockers.
+Do not describe the planned React/Vite studio or restricted Droid coordinator as
+complete until their acceptance gates pass.
+
+## Ownership and invariants
+
+- Keep one Rust crate, one Express process, one React/Vite app, and local
+  SpacetimeDB. Do not introduce distributed jobs or multi-tenant authentication.
+- Rust owns movement, decisions, accounting, and all scenario runs. Reuse
+  `crates/spacetime-module/src/engine.rs`; do not implement a second simulator in
+  TypeScript or hardcode demo profits.
+- TypeScript owns intake, approval gates, deterministic policy, and explanations.
+  Claude and Droid must not alter simulation facts or policy verdicts.
+- Preserve the supplied Zod 3 shapes in `packages/contracts/src/index.ts`.
+  Put stricter checks in companion validation and bound external input before
+  schema traversal. Money is integer cents; coordinates are normalized `0..1000`.
+- Keep gross sales, net profit, cash balance, inventory outlay, and consumed COGS
+  distinct. The $4,500 cap applies to inventory preparation, not total capital.
+- Keep local `agent_id` traits stable across paired runs; use run-scoped storage
+  keys. Preserve service progress and step-chunking determinism.
+
+## Safety boundaries
+
+- Only the human approval endpoint may initialize a newly approved world.
+  Variants derive from an approved, completed baseline with the same seed/horizon.
+  Recompute configuration hashes server-side; unknown costs are not zero.
+- Keep the local mutation identity out of browser code. Publish only with an
+  explicit `--server http://127.0.0.1:3000`. Never reset data to bypass a failure.
+- `OFFLINE_MODE=true` must prevent external provider calls even when keys exist.
+  Live failures must offer explicit fixture loading, never silently substitute it.
+- Label bundled fixtures as modeled demo data in `CAPTURED` mode, with no invented
+  actor-run IDs. Never invent Mana links, model usage, live verification, or funding.
+- Keep Droid at `AutonomyLevel.Off`, discover tools before prompting, disable tools
+  outside the application set, deny unknown permissions, and close sessions.
+  Fail closed if the tool boundary cannot be enforced.
+- Never commit `.env`, mutation tokens, `.spacetime/`, runtime captures, or build
+  artifacts. Do not log secrets or raw provider datasets.
+
+## Commands and generated files
+
+Run from the repository root. Use Node 22+, Rust 1.90.0, and matching SpacetimeDB
+1.12.0 module/CLI/client versions. Retain both npm and Cargo lockfiles.
+
+```bash
+npm install
+npm --workspace=packages/contracts run build
+npm --workspace=packages/contracts test
+npm --workspace=apps/orchestrator test
+npm run typecheck
+npm run build
+cargo fmt --manifest-path crates/spacetime-module/Cargo.toml --check
+npm run test:rust
+npm run verify
+```
+
+Run the narrow checks relevant to each change. For documentation-only changes,
+verify paths, commands, claims, and `git diff --check`; do not claim unrun tests.
+There is no dedicated lint command or runnable web dev script yet.
+
+Never hand-edit either app's `src/module_bindings/`. After Rust schema/reducer
+changes, run Rust tests, publish locally, regenerate both clients, and type-check:
+
+```bash
+spacetime publish --server http://127.0.0.1:3000 --project-path crates/spacetime-module crowdtwin -y
+spacetime generate --lang typescript --project-path crates/spacetime-module --out-dir apps/web/src/module_bindings -y
+spacetime generate --lang typescript --project-path crates/spacetime-module --out-dir apps/orchestrator/src/module_bindings -y
+npm run typecheck
+```
+
+For database/API changes, also run these with the local services running, following
+the README setup. They mutate test runs; do not use a shared database.
+
+```bash
+SPACETIME_CLI="$(command -v spacetime)" npx tsx scripts/database-gate.ts
+npx tsx scripts/api-gate.ts
+```
+
+## Delivery
+
+- Inspect Git status before editing. Preserve existing and untracked work; stage
+  only the files belonging to the requested chunk.
+- Follow the approved phase order and required gates. Stop at unresolved gate,
+  authentication, or remote-conflict failures instead of bypassing them.
+- Run focused checks, review the staged diff and status, then commit when
+  authorized. Use the configured Git identity and include:
+  `Co-authored-by: factory-droid[bot] <138933559+factory-droid[bot]@users.noreply.github.com>`.
+- Push to `origin/main` only when authorized. Never force-push or rewrite
+  published commits. Do not push failing work or credential-dependent success
+  claims that have not been verified.
