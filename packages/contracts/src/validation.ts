@@ -18,8 +18,8 @@ export const ValidatedEvidenceSchema = EventEvidenceSchema.superRefine((e, ctx) 
     if (!z.string().datetime({ offset: true }).safeParse(e[key]).success) issue(key, 'Expected ISO timestamp with timezone');
   }
   const duration = (Date.parse(e.endIso) - Date.parse(e.startIso)) / 3_600_000;
-  if (!(duration > 0 && duration <= 12) || Math.abs(duration - e.durationHours) > 1 / 3600)
-    issue('durationHours', 'Duration must match dates and be between 0 and 12 hours');
+  if (!(duration > 0 && duration <= 72) || Math.abs(duration - e.durationHours) > 1 / 3600)
+    issue('durationHours', 'Duration must match dates and be between 0 and 72 hours');
   if (e.lat !== null && (!Number.isFinite(e.lat) || Math.abs(e.lat) > 90)) issue('lat', 'Invalid latitude');
   if (e.lng !== null && (!Number.isFinite(e.lng) || Math.abs(e.lng) > 180)) issue('lng', 'Invalid longitude');
   for (const key of ['ticketPriceCents', 'platformRsvpCount', 'organizerClaimedAttendance'] as const)

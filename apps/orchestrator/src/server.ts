@@ -49,7 +49,7 @@ export function createApp(workflow: Workflow, coordinator: (job: Job) => Promise
   app.post('/api/jobs/:id/approve', async (req, res) => res.json(await workflow.approve(req.params.id, req.body)));
   app.get('/api/runs/:id', async (req, res) => { const run = workflow.run(req.params.id); res.json({ ...await workflow.db.snapshot(req.params.id), world: run.world }); });
   app.post('/api/runs/:id/step', async (req, res) => {
-    const { steps } = z.object({ steps: z.number().int().min(1).max(1440) }).strict().parse(req.body);
+    const { steps } = z.object({ steps: z.number().int().min(1).max(8640) }).strict().parse(req.body);
     res.json(await workflow.step(req.params.id, steps));
   });
   app.post('/api/runs/:id/variants', async (req, res) => res.json(await workflow.variant(req.params.id, req.body)));

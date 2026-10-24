@@ -8,6 +8,27 @@ fn world() -> World {
 }
 
 #[test]
+fn multi_day_horizon_finishes_and_preserves_paired_determinism() {
+    let mut w = world();
+    w.evidence["durationHours"] = serde_json::json!(32);
+    w.validate().unwrap();
+    assert_eq!(w.duration_sec(), 115200);
+    let mut full = Engine::new("multi-day", w.clone(), 42);
+    let mut chunks = Engine::new("multi-day", w.clone(), 42);
+    full.step(3840);
+    for _ in 0..4 {
+        chunks.step(960);
+    }
+    assert_eq!(full.sim_time_sec, 115200);
+    assert_eq!(
+        serde_json::to_value(&full).unwrap(),
+        serde_json::to_value(&chunks).unwrap()
+    );
+    w.evidence["durationHours"] = serde_json::json!(73);
+    assert!(w.validate().is_err());
+}
+
+#[test]
 fn accounting_identities_and_half_cent_rounding() {
     let mut b = world().vendor_booth;
     b.item_price_cents = 101;

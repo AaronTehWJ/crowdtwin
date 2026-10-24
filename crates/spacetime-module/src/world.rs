@@ -76,7 +76,7 @@ impl World {
         let point = |x: f32, y: f32| (0.0..=1000.0).contains(&x) && (0.0..=1000.0).contains(&y);
         if self.schema_version != "v1"
             || !(50..=1000).contains(&self.total_simulated_attendees)
-            || !(1..=43200).contains(&self.duration_sec())
+            || !(1..=259200).contains(&self.duration_sec())
             || !(1..=3600).contains(&b.prep_time_sec)
             || !(1..=50).contains(&b.parallel_servers)
             || !(1..=100_000).contains(&b.inventory_units)

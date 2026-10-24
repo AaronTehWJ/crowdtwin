@@ -1,4 +1,4 @@
-import type { WorldSpec } from '@crowdtwin/contracts';
+import type { EventEvidence, WorldSpec } from '@crowdtwin/contracts';
 
 export type Stage = 'CREATED' | 'COLLECTING' | 'EVIDENCE_READY' | 'MAP_READY' | 'PERSONAS_READY' | 'AWAITING_APPROVAL' | 'INITIALIZING' | 'APPROVED' | 'COLLECTION_TIMEOUT' | 'ERROR';
 export type Milestone = { id: number; stage: Stage; message: string };
@@ -10,7 +10,9 @@ export type Health = {
   ok: boolean; offline: boolean; spacetime: string; mutationIdentity: string;
   apify: string; claude: string; factory: string;
 };
-export type Intake = { mode: 'CAPTURED'; fixture: 'atl' | 'bay' } | { mode: 'LIVE'; url: string };
+export type Intake = { mode: 'CAPTURED'; fixture: 'atl' | 'demo' | 'bay' } | { mode: 'LIVE'; url: string };
+export const evidenceLabel = (e?: EventEvidence) => !e ? 'NO EVIDENCE' :
+  e.provenance === 'CAPTURED' ? `CAPTURED · ${e.actorRunId ? 'APIFY SNAPSHOT' : 'MODELED DEMO'}` : e.provenance;
 
 export async function api<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(`/api${path}`, {

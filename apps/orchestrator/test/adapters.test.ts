@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { collectLive, defaultWorld, loadFixture, validateEventUrl } from '../src/apifyAdapter.js';
+import { apifyInput, collectLive, defaultWorld, loadFixture, normalizeEvidence, validateEventUrl } from '../src/apifyAdapter.js';
 import { ClaudeService } from '../src/claudeService.js';
 import { providers } from '../src/config.js';
 import { boundInput } from '../src/errors.js';
@@ -12,6 +12,26 @@ import { riskPolicy, unknownCosts } from '../src/policy.js';
 test('URL allowlist rejects spoofed hosts, credentials, protocols and ports', () => {
   for (const url of ['http://eventbrite.com/e/a', 'https://eventbrite.com.evil.org/a', 'https://user@lu.ma/a', 'https://luma.com:999/a', 'https://www.lu.ma/a', 'file:///etc/passwd']) assert.throws(() => validateEventUrl(url));
   for (const host of ['eventbrite.com', 'www.eventbrite.com', 'lu.ma', 'luma.com']) assert.match(validateEventUrl(`https://${host}/event`), /^https:/);
+});
+test('actor input uses string URLs and disables organizer enrichment and harvesting', () => {
+  assert.deepEqual(apifyInput('https://www.eventbrite.com/e/example'), {
+    startUrls: ['https://www.eventbrite.com/e/example'], maxItems: 1,
+    enrichOrganizer: false, harvestOrganizerEmails: false, monitoringMode: false,
+  });
+});
+test('current actor fields preserve venue, zero coordinates, USD cents and unknown prices', () => {
+  const item = {
+    eventId: 'event', name: 'Test event', description: 'Public event',
+    startDate: '2026-10-24T11:00:00-04:00', endDate: '2026-10-24T19:00:00-04:00',
+    venueName: 'Venue', streetAddress: '1 Main Street', latitude: 0, longitude: -84,
+    priceMin: 12.50, currency: 'USD', scrapedAt: '2026-10-24T18:00:00.000Z',
+  };
+  const e = normalizeEvidence(item, 'https://www.eventbrite.com/e/example', 'run-123');
+  assert.equal(e.venueAddress, '1 Main Street'); assert.equal(e.lat, 0); assert.equal(e.lng, -84);
+  assert.equal(e.ticketPriceCents, 1250); assert.equal(e.platformRsvpCount, null);
+  assert.equal(e.capturedAtIso, item.scrapedAt);
+  assert.equal(normalizeEvidence({ ...item, currency: 'EUR' }, e.sourceUrl, 'run-123').ticketPriceCents, null);
+  assert.equal(normalizeEvidence({ ...item, priceMin: null }, e.sourceUrl, 'run-123').ticketPriceCents, null);
 });
 test('offline mode blocks providers even when keys exist', async () => {
   const config = providers({ OFFLINE_MODE: 'true', APIFY_API_TOKEN: 'test', ANTHROPIC_API_KEY: 'test', FACTORY_API_KEY: 'test' });

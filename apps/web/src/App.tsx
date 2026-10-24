@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { WorldSpec } from '@crowdtwin/contracts';
 import type { CostConfirmation } from '@crowdtwin/contracts/validation';
-import { api, sourceLabel, type Health, type Intake, type Job } from './api';
+import { api, evidenceLabel, sourceLabel, type Health, type Intake, type Job } from './api';
 import { useJob } from './useJob';
 import { Review } from './components/Review';
 import { Evidence } from './components/Evidence';
@@ -10,7 +10,7 @@ import { Simulation } from './components/Simulation';
 export function App() {
   const [health, setHealth] = useState<Health>();
   const [jobId, setJobId] = useState<string>();
-  const [fixture, setFixture] = useState<'atl' | 'bay'>('atl');
+  const [fixture, setFixture] = useState<'atl' | 'demo' | 'bay'>('atl');
   const [url, setUrl] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -45,7 +45,7 @@ export function App() {
         <button aria-pressed={view === 'underwriter'} onClick={() => setView('underwriter')}>2 · Underwriter Desk</button>
       </nav>
       <div className="status"><span className="status-dot" /><span>{health?.offline ? 'Offline providers' : health ? [health.apify, health.claude, health.factory].includes('MISSING_KEY') ? 'Provider keys missing' : 'Providers configured, unverified' : 'Connecting locally'}</span>
-        <span className="badge">{world?.evidence.provenance ?? 'NO EVIDENCE'}{world?.evidence.provenance === 'CAPTURED' ? ' · MODELED DEMO' : ''}</span></div>
+        <span className="badge">{evidenceLabel(world?.evidence)}</span></div>
     </header>
     <div className="runtime-note">LOCAL PROTOTYPE <span>Live Droid coordination is blocked by the runtime tool restriction. Offline coordination is deterministic.</span></div>
     <main>
@@ -54,7 +54,7 @@ export function App() {
       <div className="workspace">
         <aside className="sidebar">
           <section className="panel intake"><p className="eyebrow">01 / EVENT INTAKE</p><h2>Choose your event</h2>
-            <label className="field">Modeled demo fixture<select disabled={working} value={fixture} onChange={e => setFixture(e.target.value as 'atl' | 'bay')}><option value="atl">ATL festival</option><option value="bay">Bay Area market</option></select></label>
+            <label className="field">Saved event fixture<select disabled={working} value={fixture} onChange={e => setFixture(e.target.value as 'atl' | 'demo' | 'bay')}><option value="atl">Atlanta festival · Apify snapshot</option><option value="demo">ATL festival · modeled demo</option><option value="bay">Bay Area market · modeled demo</option></select></label>
             <button className="primary wide" disabled={working} onClick={() => { void start({ mode: 'CAPTURED', fixture }); }}>Load Captured Fixture</button>
             <div className="separator">or collect public evidence</div>
             <form onSubmit={e => { e.preventDefault(); void start({ mode: 'LIVE', url }); }}>
@@ -72,7 +72,7 @@ export function App() {
           {(error || job?.error || progressError) && <div className="error-banner" role="alert">{error || job?.error?.message || progressError}{job?.error && <>
             {health?.apify === 'MISSING_KEY' && <p>APIFY_API_TOKEN is missing. Configure it on the server to collect live evidence.</p>}
             {health?.offline && <p>Live collection is disabled in offline mode.</p>}
-            <p>Load Captured Fixture to continue with modeled demo evidence.</p>
+            <p>Load Captured Fixture to continue with saved evidence. Modeled demos are labeled separately.</p>
           </>}</div>}
           {!world && <section className="panel empty-state"><div className="orbital"><i /><i /><i /><b>ct</b></div><p className="eyebrow">A SMALL WORLD. A CLEARER DECISION.</p><h2>What does a full crowd<br />actually mean for your booth?</h2><p>Load a modeled event to review costs and placement.<br />Nothing runs until you approve the assumptions.</p><div className="empty-steps"><span>01 Evidence</span><span>02 Review</span><span>03 Simulate</span><span>04 Inspect</span><span>05 Compare</span><span>06 Underwrite</span></div></section>}
           {world && !approved && job?.stage === 'AWAITING_APPROVAL' && <Review key={job.id} initial={world} busy={busy} onApprove={approve} />}

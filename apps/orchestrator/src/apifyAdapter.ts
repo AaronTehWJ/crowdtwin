@@ -7,7 +7,7 @@ import type { EventEvidence, WorldSpec } from '@crowdtwin/contracts';
 import { fixtureDir, type ProviderConfig } from './config.js';
 import { AppError, boundInput } from './errors.js';
 
-export const fixtureNames = { atl: 'captured-event.json', bay: 'bay-area-event.json' } as const;
+export const fixtureNames = { atl: 'captured-event.json', demo: 'modeled-atl-event.json', bay: 'bay-area-event.json' } as const;
 export type FixtureName = keyof typeof fixtureNames;
 export function validateEventUrl(input: string): string {
   if (input.length > 2048) throw new AppError(400, 'INVALID_URL', 'URL is too long');
@@ -38,38 +38,53 @@ export class CollectionError extends AppError {
   }
 }
 
-type Collection = { runId: string; item: Record<string, any> };
+type Collection = { runId: string; datasetId?: string; item: Record<string, any> };
 export type Collector = (url: string, token: string) => Promise<Collection>;
-const collect: Collector = async (url, token) => {
+export const apifyInput = (url: string) => ({
+  startUrls: [validateEventUrl(url)], maxItems: 1, enrichOrganizer: false,
+  harvestOrganizerEmails: false, monitoringMode: false,
+});
+export async function collectApify(url: string, token: string, timeoutSecs = 25): Promise<Collection> {
   const client = new ApifyClient({ token, maxRetries: 0, timeoutSecs: 25 });
-  const run = await client.actor('memo23/eventbrite-scraper').call({
-    startUrls: [{ url }], maxItems: 1, enrichOrganizer: false,
-    harvestOrganizerEmails: false, monitoringMode: false,
-  }, { timeout: 25, waitSecs: 25, log: null });
-  if (run.status !== 'SUCCEEDED') {
-    await client.run(run.id).abort().catch(() => undefined);
-    throw new CollectionError('ACTOR_NOT_SUCCEEDED');
+  const started = await client.actor('memo23/eventbrite-scraper').start(apifyInput(url), { timeout: timeoutSecs });
+  let succeeded = false;
+  try {
+    const deadline = Date.now() + timeoutSecs * 1000;
+    let run = started;
+    while (!['SUCCEEDED', 'FAILED', 'ABORTED', 'TIMED-OUT'].includes(run.status) && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const next = await client.run(started.id).get();
+      if (!next) throw new CollectionError('RUN_UNAVAILABLE');
+      run = next;
+    }
+    if (run.status !== 'SUCCEEDED') throw new CollectionError('ACTOR_NOT_SUCCEEDED');
+    succeeded = true;
+    const { items } = await client.dataset(run.defaultDatasetId).listItems({ limit: 1 });
+    if (!items[0]) throw new CollectionError('EMPTY_DATASET');
+    return { runId: run.id, datasetId: run.defaultDatasetId, item: items[0] };
+  } finally {
+    if (!succeeded) await client.run(started.id).abort().catch(() => undefined);
   }
-  const { items } = await client.dataset(run.defaultDatasetId).listItems({ limit: 1 });
-  if (!items[0]) throw new CollectionError('EMPTY_DATASET');
-  return { runId: run.id, item: items[0] };
-};
+}
 
 export function normalizeEvidence(item: Record<string, any>, url: string, runId: string): EventEvidence {
   boundInput(item);
   const startIso = item.startIso ?? item.start?.utc ?? item.startDate;
   const endIso = item.endIso ?? item.end?.utc ?? item.endDate;
   const text = (value: any): string => typeof value === 'string' ? value : value?.text ?? '';
+  const coordinate = (value: unknown) => value === null || value === undefined || value === '' ? null : Number(value);
+  const usdPrice = item.currency === 'USD' && item.priceMin != null && Number.isFinite(Number(item.priceMin))
+    ? Math.round(Number(item.priceMin) * 100) : item.isFree === true ? 0 : null;
   const evidence = {
     eventId: String(item.eventId ?? item.id ?? ''),
-    sourceUrl: url, provenance: 'LIVE', capturedAtIso: new Date().toISOString(), actorRunId: runId,
+    sourceUrl: url, provenance: 'LIVE', capturedAtIso: item.scrapedAt ?? new Date().toISOString(), actorRunId: runId,
     title: text(item.title ?? item.name), description: text(item.description).slice(0, 12_000),
     startIso, endIso, durationHours: (Date.parse(endIso) - Date.parse(startIso)) / 3_600_000,
     venueName: item.venueName ?? item.venue?.name ?? '',
-    venueAddress: item.venueAddress ?? item.venue?.address?.localized_address_display ?? '',
-    lat: item.lat ?? (item.venue?.latitude ? Number(item.venue.latitude) : null),
-    lng: item.lng ?? (item.venue?.longitude ? Number(item.venue.longitude) : null),
-    ticketPriceCents: item.ticketPriceCents ?? null,
+    venueAddress: item.venueAddress ?? item.venue?.address?.localized_address_display ?? item.streetAddress ?? '',
+    lat: coordinate(item.lat ?? item.latitude ?? item.venue?.latitude),
+    lng: coordinate(item.lng ?? item.longitude ?? item.venue?.longitude),
+    ticketPriceCents: item.ticketPriceCents ?? usdPrice,
     platformRsvpCount: item.platformRsvpCount ?? null,
     organizerClaimedAttendance: item.organizerClaimedAttendance ?? null,
     nearbyCompetitorPriceBands: item.nearbyCompetitorPriceBands ?? [],
@@ -86,7 +101,7 @@ export async function collectLive(urlInput: string, config: ProviderConfig, opti
   let expired = false;
   let timer: ReturnType<typeof setTimeout>;
   const work = async () => {
-    const { item, runId } = await (options.collector ?? collect)(url, config.apifyToken!);
+    const { item, runId } = await (options.collector ?? collectApify)(url, config.apifyToken!);
     if (expired) throw new CollectionError('DEADLINE_EXCEEDED');
     let evidence: EventEvidence;
     try { evidence = normalizeEvidence(item, url, runId); }

@@ -12,6 +12,14 @@ beforeEach(() => { vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockRetur
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('human review', () => {
+  it('distinguishes real saved Apify evidence from modeled demos', () => {
+    const world = ValidatedWorldSchema.parse(fixture);
+    world.evidence.actorRunId = 'actual-run-reference';
+    render(<Evidence world={world} />);
+    expect(screen.getByText('CAPTURED · APIFY SNAPSHOT')).toBeTruthy();
+    expect(screen.queryByText('CAPTURED · MODELED DEMO')).toBeNull();
+    expect(screen.getByRole('link', { name: 'actual-run-reference' }).getAttribute('href')).toContain('/actors/runs/actual-run-reference');
+  });
   it('keeps evidence read-only and labels modeled fixtures honestly', () => {
     render(<Evidence world={ValidatedWorldSchema.parse(fixture)} />);
     expect(screen.getByText('CAPTURED · MODELED DEMO')).toBeTruthy();

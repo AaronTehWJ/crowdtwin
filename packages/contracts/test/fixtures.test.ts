@@ -9,7 +9,7 @@ const fixture = async (name: string) =>
 const world = () => fixture('default-world-spec') as Promise<WorldSpec>;
 
 test('bundled evidence is explicit modeled data without fabricated actor IDs', async () => {
-  for (const name of ['captured-event', 'bay-area-event']) {
+  for (const name of ['modeled-atl-event', 'bay-area-event']) {
     const e = ValidatedEvidenceSchema.parse(await fixture(name));
     assert.equal(e.provenance, 'CAPTURED');
     assert.equal(e.actorRunId, null);
@@ -19,7 +19,7 @@ test('bundled evidence is explicit modeled data without fabricated actor IDs', a
 test('world validates, hashes consistently and splits the capital assumptions', async () => {
   const w = ValidatedWorldSchema.parse(await world());
   assert.equal(w.totalSimulatedAttendees, 400);
-  assert.deepEqual(w.evidence, await fixture('captured-event'));
+  assert.deepEqual(w.evidence, await fixture('modeled-atl-event'));
   assert.equal(w.configHash, await hashWorld(w));
   assert.equal(await hashWorld({ ...w, configHash: 'untrusted' }), w.configHash);
   const b = w.vendorBooth;
@@ -27,6 +27,17 @@ test('world validates, hashes consistently and splits the capital assumptions', 
   const changed = structuredClone(w);
   changed.vendorBooth.x++;
   assert.notEqual(await hashWorld(changed), w.configHash);
+});
+test('real capture retains run provenance and supports its full multi-day horizon', async () => {
+  const e = ValidatedEvidenceSchema.parse(await fixture('captured-event'));
+  const metadata = await fixture('captured-event.provenance');
+  assert.equal(e.provenance, 'CAPTURED');
+  assert.equal(e.actorRunId, metadata.actorRunId);
+  assert.ok(e.actorRunId && metadata.datasetId);
+  assert.equal(e.durationHours, (Date.parse(e.endIso) - Date.parse(e.startIso)) / 3_600_000);
+  assert.equal(ValidatedWorldSchema.safeParse({ ...await world(), evidence: e }).success, true);
+  const tooLong = { ...e, endIso: new Date(Date.parse(e.startIso) + 73 * 3_600_000).toISOString(), durationHours: 73 };
+  assert.equal(ValidatedEvidenceSchema.safeParse(tooLong).success, false);
 });
 test('companion validation rejects incoherent or unbounded worlds', async () => {
   const original = await world();

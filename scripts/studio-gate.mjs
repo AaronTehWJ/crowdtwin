@@ -48,7 +48,7 @@ try {
   click('2 · Underwriter Desk');
   wait('NEEDS_INPUT');
 
-  browser('select', '.intake select', 'atl');
+  browser('select', '.intake select', 'demo');
   click('Load Captured Fixture');
   wait('Place your bet. Then test it.');
   click('1 · Vendor Sandbox');

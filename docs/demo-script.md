@@ -4,13 +4,21 @@ This is a practical shot list for recording the manual 90-second submission
 capture. It is written for a human operator driving the local studio. It does
 not produce or claim a recording; see the checklist at the end.
 
+This script deliberately selects the separate modeled ATL demo, not the real
+32-hour Apify snapshot. Do not use its eight-hour figures for the captured event.
+
+The database, API, and browser gates re-measured the modeled baseline, combined
+intervention, and baseline scenario table unchanged on 2026-10-24 after adding
+the separate real capture. The single-intervention columns below retain the
+earlier measurements cited here.
+
 ## Where the numbers come from
 
 - **Measured on:** 2026-10-24, repository commit `250b6d6` (`main`), against the
   locally running SpacetimeDB, offline API, and Vite studio.
-- **Run configuration:** ATL fixture evidence (`fixtures/captured-event.json`)
+- **Run configuration:** ATL fixture evidence (`fixtures/modeled-atl-event.json`)
   with the default world from `fixtures/default-world-spec.json`, requested as
-  `"mode":"CAPTURED","fixture":"atl"`; seed **42** (fixed server-side in
+  `"mode":"CAPTURED","fixture":"demo"`; seed **42** (fixed server-side in
   `apps/orchestrator/src/workflow.ts`), horizon **28,800 simulated seconds
   (8h 00m)**, 400 simulated attendees, booth left at the default position
   (`x=180, y=280`), all default booth economics unchanged, and all four costs
@@ -155,7 +163,7 @@ Spoken lines are suggestions. Keep them plain; read values from the screen.
 ### 0:22 - 0:32 Beat 1: intake with provenance (Tab B)
 
 - **Action:** switch to Tab B. In `01 / EVENT INTAKE`, leave
-  `Modeled demo fixture` on `ATL festival` and click `Load Captured Fixture`.
+  `Saved event fixture` on `ATL festival · modeled demo` and click `Load Captured Fixture`.
 - **On screen:** the progress list fills with milestones ending in
   `Human review required. No simulation has been initialized.`; the header
   badge changes to `CAPTURED · MODELED DEMO`; the sidebar `READ-ONLY EVIDENCE`

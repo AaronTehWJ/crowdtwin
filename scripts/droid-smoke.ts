@@ -8,7 +8,7 @@ if (!process.env.FACTORY_API_KEY) throw new Error('FACTORY_API_KEY is absent; cr
 const workflow = new Workflow(new Database('http://127.0.0.1:3000', 'crowdtwin'), {
   ...providers(), offline: false, apifyToken: undefined, anthropicKey: undefined,
 });
-const job = workflow.create({ mode: 'CAPTURED', fixture: 'atl' });
+const job = workflow.create({ mode: 'CAPTURED', fixture: 'demo' });
 try {
   await coordinateIntake(workflow, job);
   assert.equal(job.stage, 'AWAITING_APPROVAL', JSON.stringify(job.error));

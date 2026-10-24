@@ -22,17 +22,17 @@ production application.
 | npm workspaces, shared Zod 3 contracts, validation, modeled fixtures | Implemented and tested |
 | Deterministic Rust engine, local SpacetimeDB, generated TypeScript bindings | Implemented and tested |
 | Express API, approval gate, paired variants, explanations, risk policy | Implemented and tested offline |
-| Apify and Claude adapters | Implemented; live provider calls unverified because keys were absent |
+| Apify and Claude adapters | Apify capture verified locally with a real event/run/dataset; Claude live calls remain unverified |
 | Restricted Factory Droid coordination | On `main`, fail-closed; inert offline or without `FACTORY_API_KEY`; no credentialed end-to-end run has completed |
-| Six-beat React/Vite studio | Implemented in `apps/web`; 19 vitest tests, typecheck, build, and the browser studio gate passed on 2026-10-24 |
-| Recording and submission materials | Manual; measured shot list in [`docs/demo-script.md`](docs/demo-script.md), Mana links added below; no recording exists |
+| Six-beat React/Vite studio | Implemented in `apps/web`; 20 vitest tests, typecheck, build, and the browser studio gate passed on 2026-10-24 |
+| Recording and submission materials | Manual; measured shot list in [`docs/demo-script.md`](docs/demo-script.md), Mana links and architectural decisions documented below; no recording exists |
 
-The latest implementation checks ran on **2026-10-24** at commit `250b6d6`:
-the web tests (`npm --workspace=apps/web test`, 19 passed), the orchestrator
-tests (`npm --workspace=apps/orchestrator test`, 12 passed), `npm run typecheck`,
-`npm run build`, and `node scripts/studio-gate.mjs` (exit 0) with the local
-services running in offline mode. The demo figures below were re-measured in the
-same session.
+Local verification on **2026-10-24** passed: `npm run verify` (7 contract,
+14 orchestrator, 20 web, and 8 Rust tests), the database integration gate,
+the API gate for both the eight-hour modeled demo and the real 32-hour capture,
+and the six-beat browser studio gate. SpacetimeDB 1.12 is running locally and
+both TypeScript clients were regenerated. The modeled demo figures below were
+re-measured unchanged; they do not describe the real captured event.
 
 The Droid coordinator is delivered but **live coordination is unverified**. The
 one credentialed smoke check stopped **before sending a prompt**: the installed
@@ -62,7 +62,7 @@ The studio runs at `http://127.0.0.1:5173` once the API is up (see
    runs using deterministic underwriting rules.
 
 The studio in `apps/web` presents these six beats on one dark page: an intake
-sidebar with the provenance badge (`CAPTURED · MODELED DEMO` for fixtures), a
+sidebar with the provenance badge (`CAPTURED · APIFY SNAPSHOT` for real saved evidence; `CAPTURED · MODELED DEMO` for synthetic examples), a
 read-only evidence panel, a review form with a draggable booth on a 1,000 × 1,000
 assumption-map canvas plus editable economics and per-cost confirmation boxes, a
 Rust baseline view with Play/Pause/`+10x Step`/`Finish baseline` controls,
@@ -130,9 +130,9 @@ Requirements: **Node.js 22+**, npm, [Rustup](https://rustup.rs/), and the
 
 ```bash
 rustup toolchain install 1.90.0 --profile minimal --component rustfmt --target wasm32-unknown-unknown
-spacetime version install 1.12.0
-spacetime version use 1.12.0
-spacetime --version
+# Use the pinned project-local runtime installed for this checkout.
+export PATH="$PWD/.local/bin:$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
+./scripts/spacetime.sh --version
 
 npm install
 npm --workspace=packages/contracts run build
@@ -140,23 +140,25 @@ npm --workspace=packages/contracts run build
 
 Keep the SpacetimeDB **module, CLI/server, and npm client at 1.12.0**. Do not mix
 these bindings with current 2.x examples. Rust is pinned in `rust-toolchain.toml`.
-Ensure Cargo and SpacetimeDB are on your `PATH`.
+The project wrapper uses its own CLI identity and preserves other installations.
+For a fresh checkout, download the official 1.12 platform archive into
+`.local/spacetime-1.12.0`; see [the updated specification](FACTORY_BUILD_PROMPT.md).
 
 ### 2. Start SpacetimeDB
 
 In a dedicated terminal:
 
 ```bash
-spacetime start --listen-addr 127.0.0.1:3000 --data-dir .spacetime --non-interactive
+./scripts/spacetime.sh start --listen-addr 127.0.0.1:3000 --data-dir .spacetime --non-interactive
 ```
 
 In another terminal, create a **local server-issued identity** and publish:
 
 ```bash
-spacetime login --server-issued-login http://127.0.0.1:3000
-spacetime publish --server http://127.0.0.1:3000 --project-path crates/spacetime-module crowdtwin -y
-spacetime generate --lang typescript --project-path crates/spacetime-module --out-dir apps/web/src/module_bindings -y
-spacetime generate --lang typescript --project-path crates/spacetime-module --out-dir apps/orchestrator/src/module_bindings -y
+./scripts/spacetime.sh login --server-issued-login http://127.0.0.1:3000
+./scripts/spacetime.sh publish --server http://127.0.0.1:3000 --project-path crates/spacetime-module crowdtwin -y
+./scripts/spacetime.sh generate --lang typescript --project-path crates/spacetime-module --out-dir apps/web/src/module_bindings -y
+./scripts/spacetime.sh generate --lang typescript --project-path crates/spacetime-module --out-dir apps/orchestrator/src/module_bindings -y
 ```
 
 Use the same publishing identity for API mutations. Do not reset an existing
@@ -170,7 +172,7 @@ npm --workspace=apps/orchestrator run dev
 ```
 
 The setup script creates the ignored `apps/orchestrator/.env` with file mode
-`0600`, the local CLI token, and `OFFLINE_MODE=true`. It leaves provider keys
+`0600`, the project-local CLI token (falling back to the global config if absent), and `OFFLINE_MODE=true`. It leaves provider keys
 empty and **refuses to overwrite an existing file**. See
 [`.env.example`](.env.example) for the available settings. Never expose
 `SPACETIMEDB_TOKEN` to the browser or commit it.
@@ -239,9 +241,18 @@ end-to-end test, including approval-bypass rejection.
 
 ## Evidence and offline/live modes
 
-- **Bundled fixtures are modeled demo data, not verified live captures.**
-  They use `CAPTURED` mode with `actorRunId: null`. Their dates, attendance,
-  prices, and locations are illustrative. See [fixture notes](fixtures/README.md).
+- **The ATL snapshot is a real Apify capture.** `fixtures/captured-event.json`
+  preserves run `yJgu1aGVtuTerBN8h`; its dataset reference is in
+  `fixtures/captured-event.provenance.json`. `fixture: "atl"` loads it.
+  The modeled examples remain available as `fixture: "demo"` and `fixture: "bay"`,
+  with null actor IDs. See [fixture notes](fixtures/README.md).
+- Events up to 72 hours are supported. This captured event spans 32 elapsed
+  hours, including overnight time; closures are not modeled. Prices and attendance
+  missing from the actor remain unknown.
+- To refresh the snapshot explicitly, run `node --import tsx scripts/capture-apify.ts`.
+  It loads the local Apify key, allows a 120-second cold start, validates the result,
+  and writes normalized evidence plus run/dataset metadata. An optional URL and
+  existing run ID recover a completed run without another actor execution.
 - The default world has **400 individual attendees and three archetypes**.
   It is not a weighted simulation of the modeled 40,000-person organizer claim.
 - `OFFLINE_MODE=true` disables provider calls even if credentials exist in the
@@ -347,7 +358,7 @@ reproduce them.
 npm run verify
 
 # Requires the local database, published module, and publishing CLI identity.
-SPACETIME_CLI="$(command -v spacetime)" npx tsx scripts/database-gate.ts
+SPACETIME_CLI="$PWD/scripts/spacetime.sh" npx tsx scripts/database-gate.ts
 
 # Also requires the running API in offline mode.
 npx tsx scripts/api-gate.ts
@@ -373,7 +384,7 @@ explanations. On 2026-10-24 at `250b6d6` the web tests, typecheck, build, and
 the studio gate passed; the gate drives all six beats in a real browser, checks
 that a live failure never substitutes fixture evidence, that unconfirmed costs
 yield `NEEDS_INPUT`, and that the on-screen figures equal the measured table
-above. Real Apify/Anthropic calls remain unverified. The separate credentialed
+above. Apify capture was verified locally on 2026-10-24; real Anthropic calls remain unverified. The separate credentialed
 Droid restriction check failed closed before prompting and has not been
 repeated; the coordinator's unit tests cover its restriction logic offline.
 

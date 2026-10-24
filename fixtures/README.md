@@ -1,9 +1,22 @@
 # Fixture provenance and assumptions
 
-Both event fixtures are **modeled demo data**, not verified Apify captures.
-`CAPTURED` is their transport mode, not a claim of real collection. `actorRunId`
-is null. The source URLs identify a platform, not a verified event listing.
-`capturedAtIso` records fixture preparation time. Nothing here confirms turnout.
+`captured-event.json` is a normalized snapshot from a real Apify run on
+2026-10-24. Run `yJgu1aGVtuTerBN8h`, dataset `agXeTSnOzn9vXzISe`;
+`captured-event.provenance.json` records the source and capture time. Its
+`CAPTURED` mode means replayed evidence, not a new live API call. Unknown prices,
+RSVPs, and organizer attendance claims remain null. No raw organizer dataset or
+contact data is included. The event spans 32 hours; the simulator uses elapsed
+time and does not model overnight closures.
+
+`modeled-atl-event.json` and `bay-area-event.json` are **modeled demo data**, not
+verified captures. Their actor IDs are null. The default world retains the
+modeled ATL evidence so eight-hour regression figures stay reproducible.
+Select `atl` for the real snapshot, `demo` for the modeled ATL event, or `bay`
+for the modeled Bay Area event.
+
+Refresh explicitly with `node --import tsx scripts/capture-apify.ts`, or pass
+an event URL and successful run ID to reuse an existing dataset. Provider keys
+are read from the ignored orchestrator environment file, never copied here.
 
 The default world models 400 individuals, not a weighted sample of 40,000 people.
 Its three archetypes and normalized map are explicit assumptions.

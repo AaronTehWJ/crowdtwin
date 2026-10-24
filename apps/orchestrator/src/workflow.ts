@@ -11,7 +11,7 @@ import { AppError, boundInput } from './errors.js';
 import { riskPolicy, unknownCosts, type ScenarioSummary } from './policy.js';
 
 export const IntakeSchema = z.discriminatedUnion('mode', [
-  z.object({ mode: z.literal('CAPTURED'), fixture: z.enum(['atl', 'bay']) }).strict(),
+  z.object({ mode: z.literal('CAPTURED'), fixture: z.enum(['atl', 'demo', 'bay']) }).strict(),
   z.object({ mode: z.literal('LIVE'), url: z.string().max(2048) }).strict(),
 ]);
 export type Intake = z.infer<typeof IntakeSchema>;
@@ -74,7 +74,7 @@ export class Workflow {
   }
   async collect(job: Job) {
     this.stage(job, 'CREATED');
-    this.emit(job, 'COLLECTING', job.intake.mode === 'CAPTURED' ? 'Loading explicitly selected modeled fixture' : 'Collecting public event evidence');
+    this.emit(job, 'COLLECTING', job.intake.mode === 'CAPTURED' ? 'Loading explicitly selected saved fixture' : 'Collecting public event evidence');
     const evidence = job.intake.mode === 'CAPTURED' ? await loadFixture(job.intake.fixture) : await collectLive(job.intake.url, this.config);
     job.world = await defaultWorld(evidence);
     this.emit(job, 'EVIDENCE_READY', 'Evidence ready, vendor costs remain unconfirmed assumptions');

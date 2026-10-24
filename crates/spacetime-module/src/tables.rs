@@ -227,8 +227,8 @@ fn load(ctx: &ReducerContext, run_id: &String) -> Result<Engine, String> {
 #[spacetimedb::reducer]
 pub fn step_simulation(ctx: &ReducerContext, run_id: String, steps: u32) -> Result<(), String> {
     authorize(ctx)?;
-    if !(1..=1440).contains(&steps) {
-        return Err("Steps must be 1..1440".into());
+    if !(1..=8640).contains(&steps) {
+        return Err("Steps must be 1..8640".into());
     }
     let mut engine = load(ctx, &run_id)?;
     engine.step(steps);

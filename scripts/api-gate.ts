@@ -33,7 +33,7 @@ await awaitStage(live.id, 'COLLECTION_TIMEOUT');
 const failure = await request(`/jobs/${live.id}`);
 assert.equal(failure.error.details.cause, 'OFFLINE_MODE');
 assert.match(failure.error.details.fixtureAction, /Load Captured/);
-const job = await request('/jobs', { mode: 'CAPTURED', fixture: 'atl' }, 202);
+const job = await request('/jobs', { mode: 'CAPTURED', fixture: 'demo' }, 202);
 await awaitStage(job.id, 'AWAITING_APPROVAL');
 const draft = await request(`/jobs/${job.id}`);
 const forged = structuredClone(draft.world);
@@ -78,3 +78,26 @@ assert(chunk.startsWith('id: 4\n'));
 const foreignOrigin = await fetch(`${base}/jobs`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://attacker.example' }, body: '{}' });
 assert.equal(foreignOrigin.status, 403);
 console.log(JSON.stringify({ gate: 'passed', health, baseline: completed.booth, variant: variant.variant.booth, verdict: audit.policyVerdict }, null, 2));
+
+// Exercise the saved real event separately from the stable eight-hour demo.
+const capturedJob = await request('/jobs', { mode: 'CAPTURED', fixture: 'atl' }, 202);
+await awaitStage(capturedJob.id, 'AWAITING_APPROVAL');
+const capturedDraft = await request(`/jobs/${capturedJob.id}`);
+assert.equal(capturedDraft.world.evidence.provenance, 'CAPTURED');
+assert.ok(capturedDraft.world.evidence.actorRunId);
+const capturedRun = await request(`/jobs/${capturedJob.id}/approve`, {
+  world: capturedDraft.world,
+  costs: { unitCogsCents: true, boothFeeCents: true, staffAndEquipmentCents: true, organizerCutPct: true },
+});
+const durationSec = Math.round(capturedDraft.world.evidence.durationHours * 3600);
+const capturedDone = await request(`/runs/${capturedRun.runId}/step`, { steps: Math.ceil(durationSec / 30) });
+assert.equal(capturedDone.run.status, 'COMPLETED');
+assert.equal(capturedDone.run.simTimeSec, durationSec);
+const pairedCapture = await request(`/runs/${capturedRun.runId}/variants`, { relocate: true, addServer: true, capInventory: true });
+assert.equal(pairedCapture.horizonSec, durationSec);
+assert.equal(pairedCapture.variant.run.simTimeSec, durationSec);
+assert.equal(pairedCapture.variant.run.seed, capturedDone.run.seed);
+const capturedAudit = await request(`/runs/${pairedCapture.runId}/audit`);
+assert.equal(capturedAudit.scenarios.length, 3);
+assert.equal(capturedAudit.policyVerdict, 'REJECT');
+console.log(JSON.stringify({ capturedGate: 'passed', durationHours: durationSec / 3600, actorRunId: capturedDraft.world.evidence.actorRunId, pairedHorizonSec: pairedCapture.horizonSec }));
