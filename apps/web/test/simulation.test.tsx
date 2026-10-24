@@ -38,7 +38,7 @@ it('does not request an explanation before a decision exists', () => {
   expect(fetch).not.toHaveBeenCalled();
 });
 it('fetches the exact recorded event and labels a fallback narrative', async () => {
-  const fetch = vi.fn(async () => new Response(JSON.stringify({ event, source: 'DETERMINISTIC_FALLBACK', explanation: 'Recorded queue wait. Recorded rejection.' })));
+  const fetch = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({ event, source: 'DETERMINISTIC_FALLBACK', explanation: 'Recorded queue wait. Recorded rejection.' })));
   vi.stubGlobal('fetch', fetch);
   render(<AgentInspector agent={agent} event={event} runId="run" onClose={() => undefined} />);
   await screen.findByText('Deterministic fallback');
@@ -53,11 +53,11 @@ it('pauses playback when a customer is selected, without starting a new step', (
     status: 'CONNECTED', reconnect: vi.fn(),
   });
   render(<Simulation runId="run" world={ValidatedWorldSchema.parse(fixture)} />);
-  fireEvent.click(screen.getByRole('button', { name: 'Play', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: 'Play' }));
   fireEvent.change(screen.getByLabelText('Inspect customer'), { target: { value: '7' } });
   vi.advanceTimersByTime(1000);
   expect(fetch).not.toHaveBeenCalled();
-  expect((screen.getByRole('button', { name: 'Pause', exact: true }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole('button', { name: 'Pause' }) as HTMLButtonElement).disabled).toBe(true);
 });
 it('prevents overlapping manual steps', async () => {
   let resolve!: (response: Response) => void;

@@ -37,14 +37,14 @@ export function App() {
     catch (e) { setError((e as Error).message); }
     finally { setBusy(false); }
   };
-  const working = busy || Boolean(jobId && (!job || !['AWAITING_APPROVAL', 'APPROVED', 'ERROR', 'COLLECTION_TIMEOUT'].includes(job.stage)));
+  const working = busy || Boolean(jobId && !progressError && (!job || !['AWAITING_APPROVAL', 'APPROVED', 'ERROR', 'COLLECTION_TIMEOUT'].includes(job.stage)));
   return <div className="app">
     <header className="topbar"><a className="brand" href="/"><span className="brand-mark">ct</span><span>CrowdTwin<small>EVENT ECONOMICS STUDIO</small></span></a>
       <nav className="view-switch" aria-label="Studio view">
         <button aria-pressed={view === 'vendor'} onClick={() => setView('vendor')}>1 · Vendor Sandbox</button>
         <button aria-pressed={view === 'underwriter'} onClick={() => setView('underwriter')}>2 · Underwriter Desk</button>
       </nav>
-      <div className="status"><span className="status-dot" /><span>{health?.offline ? 'Offline providers' : health ? 'Live providers configured separately' : 'Connecting locally'}</span>
+      <div className="status"><span className="status-dot" /><span>{health?.offline ? 'Offline providers' : health ? [health.apify, health.claude, health.factory].includes('MISSING_KEY') ? 'Provider keys missing' : 'Providers configured, unverified' : 'Connecting locally'}</span>
         <span className="badge">{world?.evidence.provenance ?? 'NO EVIDENCE'}{world?.evidence.provenance === 'CAPTURED' ? ' · MODELED DEMO' : ''}</span></div>
     </header>
     <div className="runtime-note">LOCAL PROTOTYPE <span>Live Droid coordination is blocked by the runtime tool restriction. Offline coordination is deterministic.</span></div>
@@ -62,17 +62,22 @@ export function App() {
               <button className="wide" disabled={working}>Run Live Apify Scrape</button>
             </form>
             <p className="fine">A live failure never silently loads demo evidence. Use the fixture button explicitly.</p>
+            {health && <details><summary>Local service status</summary><dl className="health-status"><dt>Database</dt><dd>{health.spacetime}</dd><dt>Apify</dt><dd>{health.apify}</dd><dt>Claude</dt><dd>{health.claude}</dd><dt>Factory</dt><dd>{health.factory}</dd></dl></details>}
             {job && <div className="progress" aria-live="polite"><strong>{job.stage.replaceAll('_', ' ')}</strong><ol>{job.milestones.map(m => <li key={m.id}>{m.message}</li>)}</ol></div>}
             {job?.sources.map && <p className="fine">Map: {sourceLabel(job.sources.map)}<br />Personas: {sourceLabel(job.sources.personas)}<br />Coordinator: {sourceLabel(job.sources.coordinator)}</p>}
           </section>
           {world && <Evidence world={world} />}
         </aside>
         <div className="studio">
-          {(error || job?.error || progressError) && <div className="error-banner" role="alert">{error || job?.error?.message || progressError}{job?.error && <p>Load Captured Fixture to continue with modeled demo evidence.</p>}</div>}
+          {(error || job?.error || progressError) && <div className="error-banner" role="alert">{error || job?.error?.message || progressError}{job?.error && <>
+            {health?.apify === 'MISSING_KEY' && <p>APIFY_API_TOKEN is missing. Configure it on the server to collect live evidence.</p>}
+            {health?.offline && <p>Live collection is disabled in offline mode.</p>}
+            <p>Load Captured Fixture to continue with modeled demo evidence.</p>
+          </>}</div>}
           {!world && <section className="panel empty-state"><div className="orbital"><i /><i /><i /><b>ct</b></div><p className="eyebrow">A SMALL WORLD. A CLEARER DECISION.</p><h2>What does a full crowd<br />actually mean for your booth?</h2><p>Load a modeled event to review costs and placement.<br />Nothing runs until you approve the assumptions.</p><div className="empty-steps"><span>01 Evidence</span><span>02 Review</span><span>03 Simulate</span><span>04 Inspect</span><span>05 Compare</span><span>06 Underwrite</span></div></section>}
           {world && !approved && job?.stage === 'AWAITING_APPROVAL' && <Review key={job.id} initial={world} busy={busy} onApprove={approve} />}
           {world && !approved && job?.stage !== 'AWAITING_APPROVAL' && <section className="panel"><h2>{job?.stage === 'INITIALIZING' ? 'Preparing your Rust world…' : 'Drafting the review…'}</h2><p>No model can approve assumptions on your behalf.</p></section>}
-          {approved && <Simulation key={approved.runId} runId={approved.runId} world={approved.world} />}
+          {approved && <Simulation key={approved.runId} runId={approved.runId} world={approved.world} view={view} onUnderwriter={() => setView('underwriter')} />}
         </div>
       </div>
     </main>

@@ -6,19 +6,27 @@ import { useSimulation } from '../useSimulation';
 import { MapCanvas } from './MapCanvas';
 import { Telemetry } from './Telemetry';
 import { AgentInspector } from './AgentInspector';
+import { Comparison, type VariantResult } from './Comparison';
+import { RiskDesk } from './RiskDesk';
 
-export function Simulation({ runId, world }: { runId: string; world: WorldSpec }) {
+export function Simulation({ runId, world, view = 'vendor', onUnderwriter }: {
+  runId: string; world: WorldSpec; view?: 'vendor' | 'underwriter'; onUnderwriter?: () => void;
+}) {
   const { scene, status, reconnect } = useSimulation(runId);
   const [playing, setPlaying] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<number>();
+  const [pane, setPane] = useState<'simulation' | 'compare'>('simulation');
+  const [variant, setVariant] = useState<VariantResult>();
+  const [auditVariant, setAuditVariant] = useState(false);
   const inFlight = useRef(false);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const completed = scene?.run.status === 'COMPLETED';
   const ready = Boolean(scene && status === 'CONNECTED' && !completed);
   useEffect(() => { if (!ready) setPlaying(false); }, [ready]);
+  useEffect(() => { setPlaying(false); }, [pane, view]);
   const advance = useCallback(async (steps: number) => {
     if (inFlight.current) return;
     inFlight.current = true; setBusy(true); setError('');
@@ -27,13 +35,24 @@ export function Simulation({ runId, world }: { runId: string; world: WorldSpec }
     finally { inFlight.current = false; if (mounted.current) setBusy(false); }
   }, [runId]);
   useEffect(() => {
-    if (!playing || !ready || busy) return;
+    if (!playing || !ready || busy || pane !== 'simulation' || view !== 'vendor') return;
     const timer = setTimeout(() => { void advance(10); }, 250);
     return () => clearTimeout(timer);
-  }, [playing, ready, busy, advance, scene?.run.simTimeSec]);
+  }, [playing, ready, busy, advance, scene?.run.simTimeSec, pane, view]);
   const inspect = (id: number) => { setPlaying(false); setSelected(id); };
   const agent = scene?.agents.find(a => a.agentId === selected);
   return <div className="simulation">
+    <nav className="run-nav" aria-label="Run workspace">
+      {view === 'vendor' ? <>
+        <button aria-pressed={pane === 'simulation'} onClick={() => setPane('simulation')}>Simulation & inspection</button>
+        <button aria-pressed={pane === 'compare'} onClick={() => setPane('compare')}>Paired comparison</button>
+      </> : <label className="field">Audit run<select value={auditVariant && variant ? 'variant' : 'baseline'} onChange={e => setAuditVariant(e.target.value === 'variant')}>
+        <option value="baseline">Approved baseline</option>{variant && <option value="variant">Latest paired intervention</option>}
+      </select></label>}
+    </nav>
+    {view === 'underwriter' ? <RiskDesk key={auditVariant && variant ? variant.runId : runId} runId={auditVariant && variant ? variant.runId : runId} />
+      : pane === 'compare' ? <Comparison runId={runId} baseline={scene} result={variant} onResult={setVariant} onAudit={() => { setAuditVariant(true); onUnderwriter?.(); }} />
+      :
     <section className="panel">
       <div className="panel-heading"><div><p className="eyebrow">03 / RUST BASELINE</p><h2>A crowd is not a business case.</h2></div><span className="badge">{status === 'CONNECTED' ? 'PUBLIC SUBSCRIPTION' : status}</span></div>
       {status === 'DISCONNECTED' && <div className="error-banner" role="alert">Subscription lost. Playback is paused; displayed data may be stale. <button onClick={reconnect}>Reconnect</button></div>}
@@ -67,6 +86,6 @@ export function Simulation({ runId, world }: { runId: string; world: WorldSpec }
         </div>
         <p className="fine">Seed {scene.run.seed} · Config <code>{scene.run.configHash}</code> · Run <code>{runId}</code></p>
       </>}
-    </section>
+    </section>}
   </div>;
 }
