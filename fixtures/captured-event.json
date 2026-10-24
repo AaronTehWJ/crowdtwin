@@ -1,0 +1,20 @@
+{
+  "eventId": "evt-atl-festival-demo",
+  "sourceUrl": "https://www.eventbrite.com/",
+  "provenance": "CAPTURED",
+  "capturedAtIso": "2026-10-24T08:30:00.000Z",
+  "actorRunId": null,
+  "title": "Welcome to ATL Experience • Modeled demo",
+  "description": "Modeled demo data inspired by the Welcome to ATL / Big Fat Vegan vendor case, not a verified live capture. All dates, attendance, pricing, venue and competitor details are illustrative assumptions. The modeled organizer claim is 40,000 weekend visitors; this is not verified demand.",
+  "startIso": "2026-10-25T12:00:00.000Z",
+  "endIso": "2026-10-25T20:00:00.000Z",
+  "durationHours": 8,
+  "venueName": "ATL Festival Grounds (modeled)",
+  "venueAddress": "Atlanta, Georgia (illustrative location)",
+  "lat": 33.7646,
+  "lng": -84.3821,
+  "ticketPriceCents": 2500,
+  "platformRsvpCount": 1420,
+  "organizerClaimedAttendance": 40000,
+  "nearbyCompetitorPriceBands": ["$", "$$", "$$"]
+}

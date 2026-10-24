@@ -1,0 +1,20 @@
+{
+  "eventId": "evt-bay-night-market-demo",
+  "sourceUrl": "https://lu.ma/",
+  "provenance": "CAPTURED",
+  "capturedAtIso": "2026-10-24T08:30:00.000Z",
+  "actorRunId": null,
+  "title": "Bay Area Night Market • Modeled demo",
+  "description": "Modeled demo data, not a verified live capture. An illustrative evening market with food stalls, a music stage and families. All dates, attendance, prices and venue details are assumptions for review.",
+  "startIso": "2026-10-25T00:00:00.000Z",
+  "endIso": "2026-10-25T04:00:00.000Z",
+  "durationHours": 4,
+  "venueName": "East Bay Market Yard (modeled)",
+  "venueAddress": "Oakland, California (illustrative location)",
+  "lat": 37.8044,
+  "lng": -122.2712,
+  "ticketPriceCents": 1000,
+  "platformRsvpCount": 680,
+  "organizerClaimedAttendance": 2500,
+  "nearbyCompetitorPriceBands": ["$$", "$$"]
+}

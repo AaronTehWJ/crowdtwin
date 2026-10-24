@@ -147,3 +147,12 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# CrowdTwin local toolchains, simulation data, and private captures
+target/
+.spacetime/
+.local/
+fixtures/last-live-capture.json
+fixtures/.last-live-capture-*.tmp
+test-results/
+playwright-report/

@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "v1",
+  "configHash": "375c0c20d87535361dd096e0700d288c9d2a22b3df431b618483877083346997",
+  "evidence": {
+    "eventId": "evt-atl-festival-demo",
+    "sourceUrl": "https://www.eventbrite.com/",
+    "provenance": "CAPTURED",
+    "capturedAtIso": "2026-10-24T08:30:00.000Z",
+    "actorRunId": null,
+    "title": "Welcome to ATL Experience • Modeled demo",
+    "description": "Modeled demo data inspired by the Welcome to ATL / Big Fat Vegan vendor case, not a verified live capture. All dates, attendance, pricing, venue and competitor details are illustrative assumptions. The modeled organizer claim is 40,000 weekend visitors; this is not verified demand.",
+    "startIso": "2026-10-25T12:00:00.000Z",
+    "endIso": "2026-10-25T20:00:00.000Z",
+    "durationHours": 8,
+    "venueName": "ATL Festival Grounds (modeled)",
+    "venueAddress": "Atlanta, Georgia (illustrative location)",
+    "lat": 33.7646,
+    "lng": -84.3821,
+    "ticketPriceCents": 2500,
+    "platformRsvpCount": 1420,
+    "organizerClaimedAttendance": 40000,
+    "nearbyCompetitorPriceBands": [
+      "$",
+      "$$",
+      "$$"
+    ]
+  },
+  "mapMode": "OUTDOOR_MAP",
+  "floorplanImageUrl": null,
+  "totalSimulatedAttendees": 400,
+  "anchors": [
+    {
+      "id": "entrance",
+      "nodeType": "ENTRANCE",
+      "label": "Main entrance",
+      "x": 100,
+      "y": 850,
+      "gravityWeight": 1,
+      "competitorPriceCents": null
+    },
+    {
+      "id": "stage",
+      "nodeType": "STAGE",
+      "label": "Main stage",
+      "x": 650,
+      "y": 200,
+      "gravityWeight": 8,
+      "competitorPriceCents": null
+    },
+    {
+      "id": "exit",
+      "nodeType": "EXIT",
+      "label": "Exit",
+      "x": 930,
+      "y": 830,
+      "gravityWeight": 1,
+      "competitorPriceCents": null
+    },
+    {
+      "id": "competitor",
+      "nodeType": "COMPETITOR",
+      "label": "Food court",
+      "x": 350,
+      "y": 420,
+      "gravityWeight": 3,
+      "competitorPriceCents": 1400
+    }
+  ],
+  "vendorBooth": {
+    "boothId": "big-fat-vegan",
+    "name": "Big Fat Vegan • modeled",
+    "x": 180,
+    "y": 280,
+    "itemPriceCents": 1800,
+    "unitCogsCents": 600,
+    "prepTimeSec": 90,
+    "parallelServers": 1,
+    "inventoryUnits": 2000,
+    "boothFeeCents": 600000,
+    "staffAndEquipmentCents": 500000,
+    "organizerCutPct": 30
+  },
+  "personas": [
+    {
+      "id": "food-fan",
+      "name": "Food explorers",
+      "weight": 0.4,
+      "walletMinCents": 1600,
+      "walletMaxCents": 3500,
+      "maxWaitSec": 300,
+      "categoryAffinity": 0.9
+    },
+    {
+      "id": "budget",
+      "name": "Budget browsers",
+      "weight": 0.35,
+      "walletMinCents": 700,
+      "walletMaxCents": 2000,
+      "maxWaitSec": 120,
+      "categoryAffinity": 0.6
+    },
+    {
+      "id": "music",
+      "name": "Music first",
+      "weight": 0.25,
+      "walletMinCents": 1200,
+      "walletMaxCents": 2800,
+      "maxWaitSec": 90,
+      "categoryAffinity": 0.4
+    }
+  ]
+}
