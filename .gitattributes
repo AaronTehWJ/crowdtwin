@@ -1,0 +1,2 @@
+# Preserve exact CLI output, including its intentional blank line at EOF.
+apps/**/src/module_bindings/** linguist-generated=true whitespace=-blank-at-eof
