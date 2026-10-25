@@ -114,7 +114,8 @@ crates/spacetime-module/   Rust engine, tables, reducers, and tests
 apps/orchestrator/        Express API, adapters, workflow, and risk policy
 apps/web/                 React/Vite studio, vitest tests, and generated bindings
 scripts/                  Local environment setup and integration gates
-docs/                     Measured 90-second demo recording script
+docs/                     Measured 90-second demo recording script and the
+                          loopback-only laptop demo runbook
 ```
 
 Both apps' `src/module_bindings/` directories are generated from Rust. Do not
@@ -124,7 +125,9 @@ edit them by hand.
 
 Run the following commands from the repository root. Initial installation needs
 network access; the installed application can run against local fixtures without
-contacting external providers.
+contacting external providers. For a condensed cold-start checklist aimed at
+running the recorded demo on one laptop, see
+[`docs/demo-runbook.md`](docs/demo-runbook.md).
 
 ### 1. Install the pinned toolchain and dependencies
 
