@@ -1,5 +1,5 @@
 import { ApifyClient } from 'apify-client';
-import { readFile, writeFile, rename, unlink } from 'node:fs/promises';
+import { readFile, writeFile, rename, unlink, mkdir } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { ValidatedEvidenceSchema, ValidatedWorldSchema } from '@crowdtwin/contracts/validation';
@@ -32,7 +32,7 @@ export async function defaultWorld(evidence?: EventEvidence): Promise<WorldSpec>
 
 export class CollectionError extends AppError {
   constructor(cause: string) {
-    super(503, 'COLLECTION_TIMEOUT', 'Live collection did not produce validated evidence', {
+    super(503, 'COLLECTION_TIMEOUT', `Live collection failed (${cause}). Load a captured fixture or retry the event URL.`, {
       cause, fixtureAction: 'Load Captured Fixture (CAPTURED mode)',
     });
   }
@@ -66,7 +66,8 @@ export const apifyInput = (url: string) => ({
   startUrls: [validateEventUrl(url)], maxItems: 1, enrichOrganizer: false,
   harvestOrganizerEmails: false, monitoringMode: false,
 });
-export async function collectApify(url: string, token: string, timeoutSecs = 25): Promise<Collection> {
+export async function collectApify(url: string, token: string, timeoutSecs = 120): Promise<Collection> {
+  if (!eventbriteHosts.includes(new URL(validateEventUrl(url)).hostname)) throw new CollectionError('UNSUPPORTED_EVENT_PLATFORM');
   const client = new ApifyClient({ token, maxRetries: 0, timeoutSecs: 25 });
   const started = await client.actor('memo23/eventbrite-scraper').start(apifyInput(url), { timeout: timeoutSecs });
   let succeeded = false;
@@ -83,6 +84,7 @@ export async function collectApify(url: string, token: string, timeoutSecs = 25)
     succeeded = true;
     const { items } = await client.dataset(run.defaultDatasetId).listItems({ limit: 1 });
     if (!items[0]) throw new CollectionError('EMPTY_DATASET');
+    assertEventIdentity(url, items[0]);
     return { runId: run.id, datasetId: run.defaultDatasetId, item: items[0] };
   } finally {
     if (!succeeded) await client.run(started.id).abort().catch(() => undefined);
@@ -128,7 +130,8 @@ export async function collectLive(urlInput: string, config: ProviderConfig, opti
     let evidence: EventEvidence;
     try { evidence = normalizeEvidence(item, url, runId); }
     catch { throw new CollectionError('INVALID_EVIDENCE'); }
-    const dir = options.cacheDir ?? fixtureDir;
+    const dir = options.cacheDir ?? process.env.DATA_DIR ?? fixtureDir;
+    await mkdir(dir, { recursive: true });
     const temporary = path.join(dir, `.last-live-capture-${randomUUID()}.tmp`);
     try {
       await writeFile(temporary, `${JSON.stringify(evidence, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
@@ -140,7 +143,7 @@ export async function collectLive(urlInput: string, config: ProviderConfig, opti
   try {
     return await Promise.race([
       work(),
-      new Promise<never>((_, reject) => { timer = setTimeout(() => { expired = true; reject(new CollectionError('DEADLINE_EXCEEDED')); }, options.deadlineMs ?? 25_000); }),
+      new Promise<never>((_, reject) => { timer = setTimeout(() => { expired = true; reject(new CollectionError('DEADLINE_EXCEEDED')); }, options.deadlineMs ?? 150_000); }),
     ]);
   } catch (error) {
     if (error instanceof CollectionError) throw error;

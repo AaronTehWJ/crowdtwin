@@ -9,7 +9,10 @@ import { Simulation } from './components/Simulation';
 
 export function App() {
   const [health, setHealth] = useState<Health>();
-  const [jobId, setJobId] = useState<string>();
+  const [jobId, setJobId] = useState<string | undefined>(() => {
+    const id = new URLSearchParams(window.location.search).get('job');
+    return id && /^[a-zA-Z0-9_-]{1,80}$/.test(id) ? id : undefined;
+  });
   const [fixture, setFixture] = useState<'atl' | 'demo' | 'bay'>('atl');
   const [url, setUrl] = useState('');
   const [error, setError] = useState('');
@@ -19,15 +22,27 @@ export function App() {
   const { job, error: progressError } = useJob(jobId);
   const world = approved?.world ?? job?.world;
   useEffect(() => {
+    if (job && job.id === jobId && job.stage === 'APPROVED' && job.runId && job.world)
+      setApproved({ runId: job.runId, world: job.world });
+  }, [job, jobId]);
+  useEffect(() => {
     const controller = new AbortController();
-    void api<Health>('/health', undefined, controller.signal).then(setHealth).catch(() => {
-      if (!controller.signal.aborted) setError('Local services are unavailable. Start SpacetimeDB and the API, then refresh.');
+    const refresh = () => void api<Health>('/health', undefined, controller.signal).then(setHealth).catch(() => {
+      if (!controller.signal.aborted) setError('Services are unavailable. Check the API and database connection.');
     });
-    return () => controller.abort();
+    refresh();
+    const timer = setInterval(refresh, 10_000);
+    return () => { clearInterval(timer); controller.abort(); };
   }, []);
   const start = async (input: Intake) => {
     setBusy(true); setError(''); setApproved(undefined); setJobId(undefined);
-    try { setJobId((await api<Job>('/jobs', input)).id); }
+    try {
+      const next = await api<Job>('/jobs', input);
+      const address = new URL(window.location.href);
+      address.searchParams.set('job', next.id);
+      window.history.replaceState(null, '', address);
+      setJobId(next.id);
+    }
     catch (e) { setError((e as Error).message); }
     finally { setBusy(false); }
   };
@@ -44,10 +59,10 @@ export function App() {
         <button aria-pressed={view === 'vendor'} onClick={() => setView('vendor')}>1 · Vendor Sandbox</button>
         <button aria-pressed={view === 'underwriter'} onClick={() => setView('underwriter')}>2 · Underwriter Desk</button>
       </nav>
-      <div className="status"><span className="status-dot" /><span>{health?.offline ? 'Offline providers' : health ? [health.apify, health.claude, health.factory].includes('MISSING_KEY') ? 'Provider keys missing' : 'Providers configured, unverified' : 'Connecting locally'}</span>
+      <div className="status"><span className="status-dot" /><span>{health?.offline ? 'Offline providers' : health ? [health.apify, health.claude, health.factory].includes('MISSING_KEY') ? 'Provider keys missing' : 'Live providers' : 'Connecting'}</span>
         <span className="badge">{evidenceLabel(world?.evidence)}</span></div>
     </header>
-    <div className="runtime-note">LOCAL PROTOTYPE <span>Live Droid coordination is blocked by the runtime tool restriction. Offline coordination is deterministic.</span></div>
+    <div className="runtime-note">{health?.offline ? 'OFFLINE DEMO' : 'LIVE INTEGRATIONS'} <span>{health ? `Database: ${health.spacetime} · Claude: ${health.claude} · Droid: ${health.factory}` : 'Checking service status…'}</span></div>
     <main>
       <section className="intro"><div><p className="eyebrow">DECISIONS BEFORE COMMITMENTS</p><h1>Test the crowd.<br /><span>Know the cost.</span></h1></div>
         <p>Turn event assumptions into an inspectable micro-market.<br />Every purchase, queue, and dollar comes from Rust.</p></section>
@@ -58,11 +73,11 @@ export function App() {
             <button className="primary wide" disabled={working} onClick={() => { void start({ mode: 'CAPTURED', fixture }); }}>Load Captured Fixture</button>
             <div className="separator">or collect public evidence</div>
             <form onSubmit={e => { e.preventDefault(); void start({ mode: 'LIVE', url }); }}>
-              <label className="field">Eventbrite or Luma URL<input type="url" required maxLength={2048} placeholder="https://lu.ma/your-event" value={url} disabled={working} onChange={e => setUrl(e.target.value)} /></label>
+              <label className="field">Eventbrite URL<input type="url" required maxLength={2048} placeholder="https://www.eventbrite.com/e/your-event" value={url} disabled={working} onChange={e => setUrl(e.target.value)} /></label>
               <button className="wide" disabled={working}>Run Live Apify Scrape</button>
             </form>
             <p className="fine">A live failure never silently loads demo evidence. Use the fixture button explicitly.</p>
-            {health && <details><summary>Local service status</summary><dl className="health-status"><dt>Database</dt><dd>{health.spacetime}</dd><dt>Apify</dt><dd>{health.apify}</dd><dt>Claude</dt><dd>{health.claude}</dd><dt>Factory</dt><dd>{health.factory}</dd></dl></details>}
+            {health && <details><summary>Service status</summary><dl className="health-status"><dt>Database</dt><dd>{health.spacetime}</dd><dt>Apify</dt><dd>{health.apify}</dd><dt>Claude</dt><dd>{health.claude}</dd><dt>Factory</dt><dd>{health.factory}</dd></dl></details>}
             {job && <div className="progress" aria-live="polite"><strong>{job.stage.replaceAll('_', ' ')}</strong><ol>{job.milestones.map(m => <li key={m.id}>{m.message}</li>)}</ol></div>}
             {job?.sources.map && <p className="fine">Map: {sourceLabel(job.sources.map)}<br />Personas: {sourceLabel(job.sources.personas)}<br />Coordinator: {sourceLabel(job.sources.coordinator)}</p>}
           </section>
@@ -81,6 +96,6 @@ export function App() {
         </div>
       </div>
     </main>
-    <footer><span>CrowdTwin / Local decision support</span><span>Modeled outcomes, not forecasts. No funding authorization.</span></footer>
+    <footer><span>CrowdTwin / Decision support</span><span>Modeled outcomes, not forecasts. No funding authorization.</span></footer>
   </div>;
 }

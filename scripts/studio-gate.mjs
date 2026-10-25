@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const output = fileURLToPath(new URL('../test-results/', import.meta.url));
-const health = await (await fetch('http://localhost:4000/api/health')).json();
+const health = await (await fetch(`${process.env.API_BASE_URL ?? 'http://localhost:4000'}/api/health`)).json();
 assert.equal(health.ok, true, 'Start the local database and orchestrator');
 assert.equal(health.offline, true, 'This gate only runs with OFFLINE_MODE=true');
 const session = process.env.AGENT_BROWSER_SESSION || execFileSync('agent-browser', ['session', 'id', '--scope', 'worktree', '--prefix', 'crowdtwin-gate'], { cwd: root, encoding: 'utf8' }).trim();
@@ -26,9 +26,9 @@ const check = name => {
 const measurements = {};
 mkdirSync(output, { recursive: true });
 try {
-  browser('open', 'http://localhost:5173');
+  browser('open', process.env.STUDIO_URL ?? 'http://localhost:5173');
   browser('set', 'viewport', '1440', '1000');
-  fill('Eventbrite or Luma URL', 'https://lu.ma/crowdtwin-demo');
+  fill('Eventbrite URL', 'https://www.eventbrite.com/e/crowdtwin-demo');
   click('Run Live Apify Scrape');
   wait('Load Captured Fixture to continue');
   assert.equal(evaluate("Boolean(document.querySelector('.evidence'))"), false, 'Live failure must not substitute evidence');

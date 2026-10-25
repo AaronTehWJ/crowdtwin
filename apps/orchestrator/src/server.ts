@@ -1,20 +1,24 @@
+import { hosting, demoAuth, type Hosting } from './hosting.js';
+import path from 'node:path';
+import { repoRoot } from './config.js';
 import express from 'express';
 import cors from 'cors';
 import { z, ZodError } from 'zod';
 import { Workflow, type Job, type Milestone } from './workflow.js';
 import { AppError, boundInput } from './errors.js';
 
-const allowedOrigins = new Set(['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:4000', 'http://127.0.0.1:4000']);
-export function createApp(workflow: Workflow, coordinator: (job: Job) => Promise<void> = job => workflow.intake(job), audit: (id: string) => Promise<unknown> = id => workflow.audit(id)) {
+export function createApp(workflow: Workflow, coordinator: (job: Job) => Promise<void> = job => workflow.intake(job), audit: (id: string) => Promise<unknown> = id => workflow.audit(id), deployment: Hosting = hosting()) {
   const app = express();
   app.disable('x-powered-by');
+  const allowedOrigins = new Set(deployment.origins);
+  app.use(cors({ origin: [...allowedOrigins], credentials: true }));
+  app.use(demoAuth(deployment.password));
   app.use((req, _res, next) => {
-    if (!['localhost', '127.0.0.1'].includes(req.hostname) || (req.headers.origin && !allowedOrigins.has(req.headers.origin)))
-      return next(new AppError(403, 'LOCAL_ORIGIN_REQUIRED', 'Only the local studio may call this API'));
+    if (req.headers.origin && !allowedOrigins.has(req.headers.origin))
+      return next(new AppError(403, 'ORIGIN_NOT_ALLOWED', 'This studio origin is not configured on the API'));
     if (req.method === 'POST' && !req.is('application/json')) return next(new AppError(415, 'JSON_REQUIRED', 'Use application/json'));
     next();
   });
-  app.use(cors({ origin: [...allowedOrigins] }));
   app.use(express.json({ limit: '2mb' }));
   app.use((req, _res, next) => { try { boundInput(req.body); next(); } catch (e) { next(e); } });
   app.get('/api/health', async (_req, res) => {
@@ -25,8 +29,10 @@ export function createApp(workflow: Workflow, coordinator: (job: Job) => Promise
     res.status(connected && workflow.db.mutationConfigured ? 200 : 503).json({
       ok: connected && workflow.db.mutationConfigured, offline: config.offline,
       spacetime: connected ? 'CONNECTED' : 'UNAVAILABLE', mutationIdentity: workflow.db.mutationConfigured ? 'CONFIGURED' : 'MISSING',
-      apify: state(config.apifyToken), claude: state(config.anthropicKey), factory: state(config.factoryKey),
-      restartBehavior: 'Jobs and approvals are in memory. Database rows persist, but old runs cannot be mutated after an API restart.',
+      apify: config.offline ? 'OFFLINE_DISABLED' : workflow.apifyStatus ?? state(config.apifyToken), claude: workflow.claude.status ?? state(config.anthropicKey), factory: config.offline ? 'OFFLINE_DISABLED' : config.coordinator === 'deterministic' ? 'NOT_SELECTED' : workflow.droidStatus ?? state(config.factoryKey),
+      coordinator: config.coordinator ?? 'droid',
+      database: { uri: workflow.db.uri, name: workflow.db.name },
+      restartBehavior: workflow.persistent ? 'Approved runs and review drafts persist. Interrupted provider calls require a new intake.' : 'Jobs and approvals are in memory. Set DATA_DIR for restart recovery.',
     });
   });
   app.post('/api/jobs', (req, res) => {
@@ -58,6 +64,8 @@ export function createApp(workflow: Workflow, coordinator: (job: Job) => Promise
     res.json(await workflow.explain(req.params.id, eventId));
   });
   app.get('/api/runs/:id/audit', async (req, res) => res.json(await audit(req.params.id)));
+  app.use(express.static(path.join(repoRoot, 'apps/web/dist')));
+  app.get('/{*path}', (req, res, next) => req.path.startsWith('/api/') ? next() : res.sendFile(path.join(repoRoot, 'apps/web/dist/index.html')));
   app.use((_req, res) => res.status(404).json({ code: 'NOT_FOUND', message: 'Unknown API endpoint' }));
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     if (error instanceof ZodError) return res.status(400).json({ code: 'INVALID_INPUT', message: 'Input validation failed', issues: error.issues.map(e => ({ path: e.path, message: e.message })) });

@@ -156,3 +156,6 @@ fixtures/last-live-capture.json
 fixtures/.last-live-capture-*.tmp
 test-results/
 playwright-report/
+
+# Hosted workflow state
+data/

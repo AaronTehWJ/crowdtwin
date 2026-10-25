@@ -8,21 +8,25 @@ export type Job = {
 };
 export type Health = {
   ok: boolean; offline: boolean; spacetime: string; mutationIdentity: string;
-  apify: string; claude: string; factory: string;
+  apify: string; claude: string; factory: string; coordinator?: string;
+  database?: { uri: string; name: string };
 };
 export type Intake = { mode: 'CAPTURED'; fixture: 'atl' | 'demo' | 'bay' } | { mode: 'LIVE'; url: string };
 export const evidenceLabel = (e?: EventEvidence) => !e ? 'NO EVIDENCE' :
   e.provenance === 'CAPTURED' ? `CAPTURED · ${e.actorRunId ? 'APIFY SNAPSHOT' : 'MODELED DEMO'}` : e.provenance;
 
+export const apiUrl = (path: string) => `${(import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')}/api${path}`;
+
 export async function api<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(apiUrl(path), {
+    credentials: 'include',
     method: body === undefined ? 'GET' : 'POST',
     headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: signal ?? AbortSignal.timeout(150_000),
   });
   const value = await response.json();
-  if (!response.ok) throw new Error(value.message ?? 'Local API unavailable. Check the API and database.');
+  if (!response.ok) throw new Error(value.message ?? 'API unavailable. Check the API and database.');
   return value as T;
 }
 

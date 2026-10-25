@@ -10,8 +10,9 @@ export const publicTables = ['run_state', 'anchor_node', 'booth', 'customer_agen
 export class Database {
   constructor(public uri: string, public name: string, private token?: string) {
     const url = new URL(uri);
-    if (url.protocol !== 'http:' || !['127.0.0.1', 'localhost'].includes(url.hostname) || url.username || url.password || url.pathname !== '/')
-      throw new Error('SpacetimeDB must target the local HTTP server');
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.pathname !== '/' || url.search || url.hash)
+      throw new Error('SpacetimeDB must use an HTTP(S) server origin');
+    this.uri = url.origin;
     if (!/^[a-z0-9-]+$/.test(name)) throw new Error('Invalid database name');
   }
   get mutationConfigured() { return Boolean(this.token); }
@@ -21,11 +22,11 @@ export class Database {
         method: 'POST', headers: { 'Content-Type': sql ? 'text/plain' : 'application/json', ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}) },
         body: sql ? String(body) : JSON.stringify(body), signal: AbortSignal.timeout(120_000),
       });
-      if (!r.ok) throw new AppError(503, 'DATABASE_ERROR', 'Local database operation failed', { status: r.status });
+      if (!r.ok) throw new AppError(503, 'DATABASE_ERROR', 'Database operation failed', { status: r.status });
       return r;
     } catch (e) {
       if (e instanceof AppError) throw e;
-      throw new AppError(503, 'DATABASE_UNAVAILABLE', 'Local SpacetimeDB is unavailable');
+      throw new AppError(503, 'DATABASE_UNAVAILABLE', 'SpacetimeDB is unavailable');
     }
   }
   async rows<T>(table: typeof publicTables[number], runId?: string): Promise<T[]> {
@@ -40,7 +41,7 @@ export class Database {
     ])) as T);
   }
   private async mutate(reducer: string, args: unknown[]) {
-    if (!this.token) throw new AppError(503, 'MUTATION_IDENTITY_MISSING', 'Configure the local publisher token');
+    if (!this.token) throw new AppError(503, 'MUTATION_IDENTITY_MISSING', 'Configure the database publisher token');
     await this.request(`call/${reducer}`, args);
   }
   async init(runId: string, world: WorldSpec, seed: number) {

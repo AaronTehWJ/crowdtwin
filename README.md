@@ -13,17 +13,20 @@ recommendation. CrowdTwin does **not** approve financing or transfer money.
 
 ## Current status
 
-This is a **local prototype with a working React/Vite studio**, running
-entirely against local services and bundled fixtures. It is not a hosted or
-production application.
+CrowdTwin supports a **hosted, shared demo** with configurable API and SpacetimeDB
+URLs, an Express-served Vite build, live Claude/Apify, and persistent workflow
+metadata. See [deployment instructions](docs/deployment.md). A public deployment
+has not yet been provisioned; Docker image execution and a cloud database connection
+still need verification on the chosen host. Live Droid intake is verified with the explicitly approved ToolSearch discovery
+exception and an explicit Sonnet model.
 
 | Area | Status |
 | --- | --- |
 | npm workspaces, shared Zod 3 contracts, validation, modeled fixtures | Implemented and tested |
 | Deterministic Rust engine, local SpacetimeDB, generated TypeScript bindings | Implemented and tested |
 | Express API, approval gate, paired variants, explanations, risk policy | Implemented and tested offline |
-| Apify and Claude adapters | Apify capture verified locally with a real event/run/dataset; Claude live calls remain unverified |
-| Restricted Factory Droid coordination | On `main`, fail-closed; inert offline or without `FACTORY_API_KEY`; no credentialed end-to-end run has completed |
+| Apify and Claude adapters | Real Apify captures and Claude map/persona calls verified on 2026-10-25 |
+| Restricted Factory Droid coordination | Live intake verified on 2026-10-25; only CrowdTwin actions and approved ToolSearch discovery are allowed |
 | Six-beat React/Vite studio | Implemented in `apps/web`; 21 vitest tests, typecheck, build, and the browser studio gate passed on 2026-10-24 |
 | Recording and submission materials | Manual; measured shot list in [`docs/demo-script.md`](docs/demo-script.md), Mana links and architectural decisions documented below; no recording exists |
 
@@ -35,13 +38,21 @@ SpacetimeDB 1.12 is running locally and both TypeScript clients were
 regenerated. The modeled demo figures below were re-measured unchanged; they do
 not describe the real captured event.
 
-The Droid coordinator is delivered but **live coordination is unverified**. The
-one credentialed smoke check stopped **before sending a prompt**: the installed
-CLI still reported `ToolSearch` enabled after it was included in
-`disabledToolIds`. In that situation the coordinator's post-restriction check
-refuses to prompt and fails the job with `503 DROID_RESTRICTION_FAILED` rather
-than allowing tools outside the approved application set. The studio's runtime
-note reflects this.
+Live Droid intake was verified on **2026-10-25** using Factory CLI 0.249.0 and
+`DROID_MODEL=claude-sonnet-4-6`. Two issues were resolved: the runtime keeps
+`ToolSearch` enabled (the owner explicitly approved metadata discovery), and the
+default model returned success without invoking the required tools. The coordinator
+now requests one validated step per turn, forces direct-only tool execution through
+a pinned SDK/CLI compatibility adapter, checks actual workflow completion and
+rechecks tool restrictions before every application action. Execute, file, network and other application tools remain disabled;
+unknown permissions remain denied. The isolated Droid smoke test intentionally uses
+deterministic map/persona handlers, separately from live Anthropic verification.
+`COORDINATOR_MODE=deterministic` remains available as an explicit alternative.
+The combined live intake subsequently passed with real Apify evidence (run
+`8ARN6YTBfbj1YTA68`), `FACTORY_DROID` coordination and `CLAUDE` map/persona
+sources, stopping at human approval. The current checks passed: build, 50 JavaScript
+unit tests (7 contracts, 21 orchestrator, 22 web), database gate, API gate and
+six-beat browser gate. No cloud deployment is claimed.
 
 The studio runs at `http://127.0.0.1:5173` once the API is up (see
 [Run locally](#run-locally)). The client is **React/Vite, not Next.js**.
@@ -78,7 +89,7 @@ the mutation token.
 
 ## Architecture
 
-One Rust crate, one Express process, one React/Vite app, and local SpacetimeDB.
+One Rust crate, one Express process, one React/Vite app, and a configured SpacetimeDB server.
 There are no distributed jobs or multi-tenant authentication services.
 
 ```mermaid
@@ -99,11 +110,12 @@ flowchart LR
 - **SpacetimeDB exposes six public tables:** `run_state`, `anchor_node`, `booth`,
   `customer_agent`, `decision_event`, and `scenario_result`. Private authority
   and engine-snapshot tables protect mutations and preserve service progress.
-- **One local publisher identity can call reducers.** Browser clients are
+- **One publisher identity can call reducers.** Browser clients are
   intended to consume subscriptions, not hold the mutation token.
-- **Workflow state is process-local.** API restarts discard jobs, approval
-  metadata, and SSE history. Database rows persist, but old runs cannot be
-  mutated through the restarted API. Start a new intake and approval flow.
+- **Workflow state persists when `DATA_DIR` is configured.** Review drafts,
+  approved runs and SSE history survive API restarts on a durable volume.
+  Interrupted provider/initialization work is marked failed, never auto-retried.
+  Without `DATA_DIR`, state remains process-local. Run one API replica.
 
 ### Repository layout
 
@@ -202,11 +214,12 @@ npm --workspace=apps/web run dev
 
 Open `http://127.0.0.1:5173`. Vite binds `127.0.0.1:5173` with `--strictPort`
 and proxies `/api` to `http://127.0.0.1:4000`, so the API must already be up.
-The API accepts browser origins `http://localhost:5173`, `http://127.0.0.1:5173`,
-`http://localhost:4000`, and `http://127.0.0.1:4000` only. The browser
-subscribes to public SpacetimeDB tables directly on `http://127.0.0.1:3000`
-(override with `VITE_SPACETIMEDB_URI` / `VITE_SPACETIMEDB_DB_NAME`; only
-`localhost`/`127.0.0.1` over plain HTTP is accepted).
+The API accepts exact browser origins configured through `ALLOWED_ORIGINS`;
+local Vite/API origins are the development defaults. The browser uses the database
+URL/name reported by the API, with optional `VITE_SPACETIMEDB_URI` and
+`VITE_SPACETIMEDB_DB_NAME` build-time overrides. `VITE_API_BASE_URL` configures a
+separately hosted API; leave it blank for same-origin hosting. Never put tokens
+or provider keys in Vite variables. See [hosting](docs/deployment.md).
 
 ## API workflow
 
@@ -275,24 +288,27 @@ end-to-end test, including approval-bypass rejection.
   `luma.com`, without credentials or custom ports. Allowlisting a host does not
   establish that the actor supports every event on that platform.
 - The adapter uses `memo23/eventbrite-scraper`, with organizer enrichment and
-  email harvesting disabled, and a 25-second collection deadline.
+  email harvesting disabled, a 120-second actor timeout and a 150-second collection deadline.
+  Only Eventbrite collection is implemented; Luma returns an explicit unsupported-platform error.
 - Missing keys, timeouts, and invalid evidence return `COLLECTION_TIMEOUT`
   with a specific cause and an explicit fixture action. Data is never silently
   replaced with a fixture.
 - Successful live evidence is normalized and atomically cached in ignored
-  `fixtures/last-live-capture.json`. Raw actor datasets are not bundled.
+  `fixtures/last-live-capture.json` (or `DATA_DIR/last-live-capture.json` when configured). Raw actor datasets are not bundled.
 - `ANTHROPIC_API_KEY` enables the Claude adapter when `OFFLINE_MODE=false`.
-- `FACTORY_API_KEY` together with `OFFLINE_MODE=false` enables the restricted
-  Droid coordinator (`apps/orchestrator/src/droidCoordinator.ts`). Without both
-  it is inert and the deterministic workflow runs, labelled
-  `DETERMINISTIC_FALLBACK`. With both, it starts a session at
-  `AutonomyLevel.Off`, lists tools, disables everything outside the five
-  `crowdtwin___*` MCP tools, re-lists to verify, and fails the job with
-  `503 DROID_RESTRICTION_FAILED` if any other tool is still enabled. The tools
+  `ANTHROPIC_MODEL` defaults to `claude-sonnet-4-6`; live failures return sanitized
+  errors rather than silently producing deterministic output.
+- `COORDINATOR_MODE=droid`, `FACTORY_API_KEY` and `OFFLINE_MODE=false` enable the restricted
+  Droid coordinator (`apps/orchestrator/src/droidCoordinator.ts`). Offline mode or explicit
+  `COORDINATOR_MODE=deterministic` runs deterministic coordination, labeled
+  `DETERMINISTIC_FALLBACK`. Missing live credentials fail explicitly. Droid starts a session at
+  `AutonomyLevel.Off`, lists tools, disables action tools outside the five
+  `crowdtwin___*` MCP tools, permits the owner-approved ToolSearch discovery tool,
+  re-lists to verify, and fails the job with `503 DROID_RESTRICTION_FAILED` if any
+  other action tool is still enabled. The tools
   take no arguments and only call stage-gated workflow methods; the audit tool
-  returns the unchanged deterministic policy result. No credentialed end-to-end
-  run has completed; the manual check is `npx tsx scripts/droid-smoke.ts`, which
-  needs an exported `FACTORY_API_KEY` and network access and never contacts
+  returns the unchanged deterministic policy result. The isolated live coordination gate passed; the manual check is `npx tsx scripts/droid-smoke.ts`, which
+  loads `FACTORY_API_KEY` from the environment or orchestrator dotenv file and needs network access and never contacts
   Apify or Anthropic. Configuring a key does not make the integration verified.
 
 ## Accounting, determinism, and policy
@@ -413,9 +429,10 @@ explanations. On 2026-10-24 at `b68141d`, `npm run verify`, the web tests,
 typecheck, build, the API gate, and the studio gate passed; the gate drives all
 six beats in a real browser, checks that a live failure never substitutes
 fixture evidence, that unconfirmed costs yield `NEEDS_INPUT`, and that the
-on-screen figures equal the measured table above. Apify capture was verified locally on 2026-10-24; real Anthropic calls remain unverified. The separate credentialed
-Droid restriction check failed closed before prompting and has not been
-repeated; the coordinator's unit tests cover its restriction logic offline.
+on-screen figures equal the measured table above. Apify captures and real Anthropic map/persona calls were verified on 2026-10-25.
+The database, API and studio gates were rerun successfully after hosted configuration
+changes. Droid intake passed with CLI 0.249.0 and the owner-approved ToolSearch discovery
+exception after selecting `claude-sonnet-4-6` explicitly.
 
 ## Troubleshooting and limits
 
@@ -425,12 +442,11 @@ repeated; the coordinator's unit tests cover its restriction logic offline.
   published the database. Keep it server-side; do not weaken reducer authorization.
 - **Environment file already exists:** review it locally rather than overwriting
   it or pasting credentials into logs.
-- **Old run requires approval after restart:** approval metadata is intentionally
-  not persisted. Create a new job.
+- **Old run requires approval after restart:** set `DATA_DIR` to a persistent volume before
+  starting the API. Older in-memory jobs cannot be recovered retroactively.
 - **Studio will not start on 5173:** the dev script uses `--strictPort`, so
   another process on `127.0.0.1:5173` makes Vite exit instead of choosing a
-  different port. Free the port; do not change it, because the API only accepts
-  the listed local origins.
+  different port. Free the port or update `ALLOWED_ORIGINS` and the Vite port together.
 - **Studio shows "Local services are unavailable":** the Vite proxy could not
   reach `http://127.0.0.1:4000`. Start the API first, then refresh.
 - **Simulation badge reads `DISCONNECTED`:** the browser's public SpacetimeDB
@@ -444,7 +460,8 @@ repeated; the coordinator's unit tests cover its restriction logic offline.
   optimization warning, not a failed build.
 - **Capacity:** local limits are 100 jobs per API process and 100 stored runs,
   plus 10 SSE subscribers per job. Restarting the API does not clear database runs.
-- **Security:** this prototype is loopback-only and not production-hardened.
+- **Security:** hosted mode requires explicit allowed origins and a shared demo
+  password. Use an HTTPS ingress; this is not a multi-tenant application.
   Dependency audit reports advisories affecting the required Zod 3 stack and
   the Droid SDK's UUID dependency. Inputs are bounded before Zod validation,
   but these advisories are not claimed to be resolved.
@@ -485,8 +502,8 @@ the original pivot, the difference is noted.
    lists tools, passes every tool outside the five `crowdtwin___*` tools to
    `disabledToolIds`, re-lists to verify, and uses a deny-by-default
    `permissionHandler` that proceeds only for those five MCP tools. The
-   restriction logic is unit-tested offline; no credentialed end-to-end run has
-   completed. The async design (end the turn, poll Apify from Node, resume the
+   restriction logic is unit-tested offline; live intake and audit coordination
+   have also been exercised with explicit model and runtime settings. The async design (end the turn, poll Apify from Node, resume the
    session) was not implemented: `collect_event` calls the workflow
    synchronously under the adapter's 25-second deadline.
 3. **The "10-second live scrape" myth.** Earlier assumption: a live scrape

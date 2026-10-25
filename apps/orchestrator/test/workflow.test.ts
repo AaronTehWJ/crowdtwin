@@ -17,7 +17,8 @@ test('stage-gated handlers cannot draft, submit, audit or approve early', async 
   assert.equal(workflow.runs.size, 0);
 });
 
-test('local database enforcement rejects remote hosts', () => {
-  for (const uri of ['https://maincloud.spacetimedb.com', 'http://127.0.0.1.attacker.example:3000', 'http://user:secret@localhost:3000'])
-    assert.throws(() => new Database(uri, 'crowdtwin'), /local HTTP/);
+test('database accepts configured remote origins but rejects credentials and URL suffixes', () => {
+  assert.doesNotThrow(() => new Database('https://maincloud.spacetimedb.com', 'crowdtwin'));
+  for (const uri of ['file:///tmp/db', 'https://user:secret@server.example', 'https://server.example/path', 'https://server.example?token=x'])
+    assert.throws(() => new Database(uri, 'crowdtwin'), /HTTP\(S\)/);
 });

@@ -64,7 +64,7 @@ test('validated captures are atomically cached and invalid data is rejected', as
     });
     assert.equal(e.provenance, 'LIVE');
     assert.deepEqual(JSON.parse(await readFile(path.join(dir, 'last-live-capture.json'), 'utf8')), e);
-    await assert.rejects(collectLive(e.sourceUrl, config, { cacheDir: dir, collector: async () => ({ item: {}, runId: 'test' }) }), /validated evidence/);
+    await assert.rejects(collectLive(e.sourceUrl, config, { cacheDir: dir, collector: async () => ({ item: {}, runId: 'test' }) }), /INVALID_EVIDENCE/);
   } finally { await rm(dir, { recursive: true }); }
 });
 test('policy uses NEEDS_INPUT, REJECT, REFER, APPROVE order and explicit zero', async () => {
@@ -88,4 +88,10 @@ test('policy uses NEEDS_INPUT, REJECT, REFER, APPROVE order and explicit zero', 
 });
 test('prevalidation bounds oversized collections and deep inputs', () => {
   assert.throws(() => boundInput(Array(101).fill(null)), /Collection/);
+});
+
+test('live Claude does not silently claim success without a configured key', async () => {
+  const service = new ClaudeService(providers({ OFFLINE_MODE: 'false' }));
+  await assert.rejects(service.draftMap(await defaultWorld()), e => (e as any).code === 'CLAUDE_MISSING_KEY');
+  assert.equal(service.status, 'MISSING_KEY');
 });

@@ -1,3 +1,5 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
+import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { z } from 'zod';
@@ -29,8 +31,33 @@ export class Workflow {
   runs = new Map<string, ApprovedRun>();
   events = new EventEmitter();
   private locks = new Map<string, Promise<unknown>>();
+  apifyStatus?: string;
+  droidStatus?: string;
   claude: ClaudeService;
-  constructor(public db: Database, public config: ProviderConfig) { this.claude = new ClaudeService(config); }
+  constructor(public db: Database, public config: ProviderConfig, private stateDir?: string) {
+    this.claude = new ClaudeService(config);
+    if (stateDir) {
+      mkdirSync(stateDir, { recursive: true, mode: 0o700 });
+      const file = path.join(stateDir, 'workflow.json');
+      if (existsSync(file)) {
+        const state = JSON.parse(readFileSync(file, 'utf8'));
+        if (state.version !== 1 || state.database !== `${db.uri}/${db.name}`) throw new Error('Workflow state belongs to a different database or version');
+        this.jobs = new Map(state.jobs);
+        this.runs = new Map(state.runs);
+        for (const job of this.jobs.values()) {
+          if (!['AWAITING_APPROVAL', 'APPROVED', 'ERROR', 'COLLECTION_TIMEOUT'].includes(job.stage))
+            this.fail(job, new AppError(409, 'INTERRUPTED', 'Server restarted during this operation. Start a new intake; provider calls are not automatically retried.'));
+        }
+      }
+    }
+  }
+  get persistent() { return Boolean(this.stateDir); }
+  persist() {
+    if (!this.stateDir) return;
+    const file = path.join(this.stateDir, 'workflow.json');
+    writeFileSync(`${file}.tmp`, JSON.stringify({ version: 1, database: `${this.db.uri}/${this.db.name}`, jobs: [...this.jobs], runs: [...this.runs] }), { mode: 0o600 });
+    renameSync(`${file}.tmp`, file);
+  }
   job(id: string): Job {
     const job = this.jobs.get(id);
     if (!job) throw new AppError(404, 'JOB_NOT_FOUND', 'Unknown job, or the orchestrator restarted');
@@ -48,6 +75,7 @@ export class Workflow {
     job.stage = stage;
     const event = { id: job.milestones.length + 1, stage, message };
     job.milestones.push(event);
+    this.persist();
     this.events.emit(job.id, event);
   }
   async serial<T>(key: string, fn: () => Promise<T>): Promise<T> {
@@ -69,6 +97,7 @@ export class Workflow {
   }
   fail(job: Job, error: unknown) {
     const e = error instanceof AppError ? error : new AppError(500, 'WORKFLOW_ERROR', 'Workflow failed; retry with a new job');
+    if (e.code === 'COLLECTION_TIMEOUT') this.apifyStatus = 'COLLECTION_FAILED';
     job.error = { code: e.code, message: e.message, details: e.details };
     this.emit(job, e.code === 'COLLECTION_TIMEOUT' ? 'COLLECTION_TIMEOUT' : 'ERROR', e.message);
   }
@@ -76,6 +105,7 @@ export class Workflow {
     this.stage(job, 'CREATED');
     this.emit(job, 'COLLECTING', job.intake.mode === 'CAPTURED' ? 'Loading explicitly selected saved fixture' : 'Collecting public event evidence');
     const evidence = job.intake.mode === 'CAPTURED' ? await loadFixture(job.intake.fixture) : await collectLive(job.intake.url, this.config);
+    if (job.intake.mode === 'LIVE') this.apifyStatus = 'VERIFIED';
     job.world = await defaultWorld(evidence);
     this.emit(job, 'EVIDENCE_READY', 'Evidence ready, vendor costs remain unconfirmed assumptions');
   }
@@ -147,6 +177,7 @@ export class Workflow {
       await this.db.step(runId, Math.ceil(before.run.simTimeSec / 30));
       await this.db.batch(runId, world);
       this.runs.set(runId, { ...baseline, world });
+      this.persist();
       return { runId, baselineId: id, seed: baseline.seed, horizonSec: before.run.simTimeSec, world, baseline: before, variant: await this.db.snapshot(runId) };
     });
   }

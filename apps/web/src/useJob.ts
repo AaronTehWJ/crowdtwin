@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, isTerminal, type Job } from './api';
+import { api, apiUrl, isTerminal, type Job } from './api';
 
 export function useJob(id: string | undefined) {
   const [job, setJob] = useState<Job>();
@@ -8,7 +8,7 @@ export function useJob(id: string | undefined) {
     setJob(undefined); setError('');
     if (!id) return;
     const controller = new AbortController();
-    const events = new EventSource(`/api/jobs/${id}/events`);
+    const events = new EventSource(apiUrl(`/jobs/${id}/events`), { withCredentials: true });
     let refreshing = false;
     let again = false;
     const refresh = async () => {
@@ -23,7 +23,7 @@ export function useJob(id: string | undefined) {
           if (isTerminal(value.stage)) events.close();
         } while (again);
       } catch {
-        if (!controller.signal.aborted) setError('Progress connection lost. Reconnecting to the local API…');
+        if (!controller.signal.aborted) setError('Progress connection lost. Reconnecting to the API…');
       } finally { refreshing = false; }
     };
     events.onmessage = () => { void refresh(); };

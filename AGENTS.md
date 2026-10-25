@@ -1,18 +1,18 @@
 # CrowdTwin repository guide
 
-CrowdTwin is a local spatial vendor-economics simulator and underwriting prototype.
+CrowdTwin is a spatial vendor-economics simulator with local and hosted shared-demo configuration.
 Read `README.md` for current delivery status, setup, measured results, and blockers.
 The React/Vite studio is delivered; its gates are the web vitest suite, typecheck,
-build, and `scripts/studio-gate.mjs`. The restricted Droid coordinator is on
-`main` and fails closed, but no credentialed end-to-end run has completed: never
-describe live Droid coordination as verified. `docs/demo-script.md` quotes
+build, and `scripts/studio-gate.mjs`. Live Droid intake passed on 2026-10-25 with CLI 0.249.0, explicit Sonnet 4.6,
+and the owner-approved ToolSearch discovery exception. Report each live gate
+separately; never infer provider verification from mocks or key presence. `docs/demo-script.md` quotes
 measured engine output; re-measure it whenever the engine, fixtures, default
 world, or policy change.
 
 ## Ownership and invariants
 
-- Keep one Rust crate, one Express process, one React/Vite app, and local
-  SpacetimeDB. Do not introduce distributed jobs or multi-tenant authentication.
+- Keep one Rust crate, one Express process, one React/Vite app, and a configured
+  SpacetimeDB server. Do not introduce distributed jobs or multi-tenant authentication.
 - Rust owns movement, decisions, accounting, and all scenario runs. Reuse
   `crates/spacetime-module/src/engine.rs`; do not implement a second simulator in
   TypeScript or hardcode demo profits.
@@ -31,8 +31,8 @@ world, or policy change.
 - Only the human approval endpoint may initialize a newly approved world.
   Variants derive from an approved, completed baseline with the same seed/horizon.
   Recompute configuration hashes server-side; unknown costs are not zero.
-- Keep the local mutation identity out of browser code. Publish only with an
-  explicit `--server http://127.0.0.1:3000`. Never reset data to bypass a failure.
+- Keep the publisher mutation identity out of browser code. Publish only with an
+  explicit `--server` targeting the user-selected database server. Never reset data to bypass a failure.
 - `OFFLINE_MODE=true` must prevent external provider calls even when keys exist.
   Live failures must offer explicit fixture loading, never silently substitute it.
 - Modeled fixtures (`demo`, `bay`) are labelled modeled demo data in `CAPTURED`
@@ -41,7 +41,9 @@ world, or policy change.
   `fixtures/captured-event.provenance.json`. Never invent actor-run IDs, Mana
   links, model usage, live verification, or funding.
 - Keep Droid at `AutonomyLevel.Off`, discover tools before prompting, disable tools
-  outside the application set, deny unknown permissions, and close sessions.
+  outside the application set (ToolSearch metadata discovery is explicitly allowed
+  by the owner), deny unknown permissions, and close sessions. Verify the boundary
+  before prompting and again before each application tool action.
   Fail closed if the tool boundary cannot be enforced.
 - Never commit `.env`, mutation tokens, `.spacetime/`, runtime captures
   (`fixtures/last-live-capture.json` and raw actor datasets; the reviewed
@@ -113,6 +115,7 @@ node scripts/studio-gate.mjs
   only the files belonging to the requested chunk.
 - Follow the approved phase order and required gates. Stop at unresolved gate,
   authentication, or remote-conflict failures instead of bypassing them.
+- Use a durable DATA_DIR volume and one API replica for hosted workflow persistence.
 - Run focused checks, review the staged diff and status, then commit when
   authorized. Use the configured Git identity and include:
   `Co-authored-by: factory-droid[bot] <138933559+factory-droid[bot]@users.noreply.github.com>`.
